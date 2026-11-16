@@ -172,6 +172,7 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .pd-h b { display: block; font-family: var(--display); font-size: 18px; color: var(--chalk); }
 .pp { width: 100%; border: 0; border-radius: 6px; background: rgba(79,211,154,.16); color: var(--good); font-size: 10.5px; font-weight: 700; padding: 3px 1px; line-height: 1.15; }
 .pp.hard { background: rgba(255,159,90,.18); color: var(--warn); }
+.pp.easy { background: var(--court-3); color: var(--muted); }
 .pp small { display: block; font-weight: 500; font-size: 10px; }
 .pg { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--ball); color: var(--ball-ink); font-family: var(--display); font-weight: 700; font-size: 18px; text-decoration: none; margin-top: auto; }
 .pg.done { background: var(--court-3); color: var(--good); font-size: 14px; width: auto; padding: 0 5px; }
@@ -509,7 +510,10 @@ function weekBar(wi) {
 
 /* ------------------------------------------------------------------ PADEL PRÉVU (matchs, entraînements, cours) */
 const PTYPES = { match: "Match", entrainement: "Entraînement", cours: "Cours", tournoi: "Tournoi" };
-const HARD = t => t === "match" || t === "tournoi";
+const EASY = p => p.int === "facile";
+const HARD = p => p.type === "tournoi" || (p.type === "match" && !EASY(p));
+const INT_W = { facile: 0.5, normal: 1, intense: 1.3 };
+const LOAD = p => (+p.dur || 0) * (p.type === "tournoi" ? 1.3 : INT_W[p.int || "normal"] || 1);
 const WD = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
 const durLabel = m => m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? String(m % 60).padStart(2, "0") : "") : m + " min";
 // Tout le padel d'un jour : séances notées (ponctuelles ou chaque semaine) + tournois du calendrier Compét
@@ -522,37 +526,39 @@ function padelOn(iso) {
   for (const t of [...(S.comp?.upcoming || []), ...(S.comp?.results || [])]) if (t.date === iso) out.push({ id: "t-" + t.id, type: "tournoi", dur: 300, label: t.cat + (t.name ? " · " + t.name : ""), fromComp: true, occ: iso });
   return out.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
 }
-const padelMin = iso => padelOn(iso).reduce((s, p) => s + (+p.dur || 0), 0);
-const hardOn = iso => padelOn(iso).some(p => HARD(p.type));
+const padelMin = iso => padelOn(iso).reduce((s, p) => s + LOAD(p), 0); // minutes « pondérées » par l'intensité
+const hardOn = iso => padelOn(iso).some(HARD);
 const plusDays = (iso, n) => isoDate(new Date(parseISO(iso).getTime() + n * DAY));
 
 // Ce qui est conseillé pour une séance un jour donné : { ok: false, why } si à éviter, { pen, why } sinon
 function sessionFit(k, iso) {
   const today = padelOn(iso), tom = padelOn(plusDays(iso, 1)), after = padelOn(plusDays(iso, 2)), yest = padelMin(plusDays(iso, -1));
-  const minToday = today.reduce((s, p) => s + (+p.dur || 0), 0);
-  const name = l => l.map(p => PTYPES[p.type].toLowerCase()).join(" + ");
+  const loadToday = today.reduce((s, p) => s + LOAD(p), 0);
+  const tomReal = tom.filter(p => !EASY(p)), tomEasy = tom.filter(EASY);
+  const name = l => l.map(p => PTYPES[p.type].toLowerCase() + (EASY(p) ? " tranquille" : "")).join(" + ");
   if (today.some(p => p.type === "tournoi")) return { ok: false, why: "jour de tournoi" };
   if (k === "A") {
-    if (tom.length) return { ok: false, why: `${name(tom)} demain : garde 48 h entre jambes lourdes et padel` };
-    if (today.some(p => HARD(p.type))) return { ok: false, why: "match le même jour" };
+    if (tomReal.length) return { ok: false, why: `${name(tomReal)} demain : garde 48 h entre jambes lourdes et padel` };
+    if (today.some(HARD)) return { ok: false, why: "match le même jour" };
     let pen = 0, why = "";
-    if (after.some(p => HARD(p.type))) { pen += 4; why = "match dans 2 jours, c'est juste"; }
-    if (minToday) { pen += 4; why = why || "padel le même jour"; }
+    if (tomEasy.length) { pen += 2; why = `${name(tomEasy)} demain, ça passe mais tes jambes seront lourdes`; }
+    if (after.some(HARD)) { pen += 4; why = why || "match dans 2 jours, c'est juste"; }
+    if (loadToday) { pen += loadToday >= 60 ? 4 : 2; why = why || "padel le même jour"; }
     if (yest >= 90) { pen += 2; why = why || "grosse séance de padel la veille"; }
     return { ok: true, pen, why };
   }
   if (k === "C") {
-    if (tom.some(p => HARD(p.type))) return { ok: false, why: "match demain : pas de sauts ni de sprints la veille" };
-    if (today.some(p => HARD(p.type))) return { ok: false, why: "match le même jour" };
+    if (tom.some(HARD)) return { ok: false, why: "match demain : pas de sauts ni de sprints la veille" };
+    if (today.some(HARD)) return { ok: false, why: "match le même jour" };
     let pen = 0, why = "";
-    if (tom.length) { pen += 3; why = `${name(tom)} demain`; }
-    if (minToday) { pen += 3; why = why || "padel le même jour"; }
+    if (tomReal.length) { pen += 3; why = `${name(tomReal)} demain`; } else if (tomEasy.length) { pen += 1; why = `${name(tomEasy)} demain`; }
+    if (loadToday) { pen += loadToday >= 60 ? 3 : 1; why = why || "padel le même jour"; }
     return { ok: true, pen, why };
   }
   // B : haut du corps, possible la veille d'un match
   let pen = 0, why = "";
-  if (minToday > 60) { pen += 3; why = "padel le même jour"; } else if (minToday) { pen += 1; why = "padel court le même jour"; }
-  if (today.some(p => HARD(p.type))) { pen += 3; why = "match le même jour"; }
+  if (loadToday > 60) { pen += 3; why = "padel le même jour"; } else if (loadToday) { pen += 1; why = "padel tranquille le même jour"; }
+  if (today.some(HARD)) { pen += 3; why = "match le même jour"; }
   return { ok: true, pen, why };
 }
 
@@ -592,19 +598,19 @@ function planWeek(wi) {
 function doneDayMap(m) { return Object.fromEntries(Object.entries(m)); }
 
 function padelWeekHtml(wi) {
-  const P = planWeek(wi); const total = P.days.reduce((s, d) => s + padelMin(d), 0);
+  const P = planWeek(wi); const total = P.days.reduce((s, d) => s + padelOn(d).reduce((t, p) => t + (+p.dur || 0), 0), 0);
   const cells = P.days.map((d, i) => {
     const pad = padelOn(d), gym = P.doneDay[d] || P.plan[d], past = d < P.todayIso, isToday = d === P.todayIso;
     return `<div class="pday ${isToday ? "today" : ""} ${past ? "past" : ""}">
       <div class="pd-h">${WD[i]}<b>${parseISO(d).getDate()}</b></div>
-      ${pad.map(p => `<button class="pp ${HARD(p.type) ? "hard" : ""}" type="button" ${p.fromComp ? `onclick="location.hash='#competition'"` : `data-pad="${p.id}" data-occ="${d}"`}>${{ match: "Match", entrainement: "Entraîn.", cours: "Cours", tournoi: "Tournoi" }[p.type]}<small>${p.type === "tournoi" ? "" : durLabel(+p.dur)}</small></button>`).join("")}
+      ${pad.map(p => `<button class="pp ${HARD(p) ? "hard" : ""} ${EASY(p) ? "easy" : ""}" type="button" ${p.fromComp ? `onclick="location.hash='#competition'"` : `data-pad="${p.id}" data-occ="${d}"`}>${{ match: "Match", entrainement: "Entraîn.", cours: "Cours", tournoi: "Tournoi" }[p.type]}<small>${p.type === "tournoi" ? "" : durLabel(+p.dur) + (EASY(p) ? " · cool" : p.int === "intense" ? " · dur" : "")}</small></button>`).join("")}
       ${gym ? `<a class="pg ${P.doneDay[d] ? "done" : ""}" href="#seance-${gym.toLowerCase()}">${gym}${P.doneDay[d] ? " ✓" : ""}</a>` : !pad.length && !past ? `<span class="pr">repos</span>` : ""}
     </div>`;
   }).join("");
   const tip = P.unplaced.length ? `<div class="notice small">Pas de bon créneau cette semaine pour la séance ${P.unplaced.join(" et ")} avec ton padel prévu. Saute-la, ou fais-la en allégeant.</div>` : "";
   return { html: `<div class="row between"><h2>Ta semaine</h2><button class="btn sm" id="pad-add" type="button">+ Padel</button></div>
     <div class="pweek">${cells}</div>
-    <p class="small muted" style="margin:-4px 0 0">${total ? `${durLabel(total)} de padel prévues. ` : ""}Les lettres A, B, C sont les séances de salle placées en fonction de ton padel.${total >= 180 ? " Tu fais beaucoup de padel : le cardio de la séance C est réduit." : ""}</p>${tip}`, P };
+    <p class="small muted" style="margin:-4px 0 0">${total ? `${durLabel(total)} de padel prévues. ` : ""}Les lettres A, B, C sont les séances de salle placées en fonction de ton padel.${wi.padelWeek >= 180 ? " Tu fais beaucoup de padel : le cardio de la séance C est réduit." : ""}</p>${tip}`, P };
 }
 
 function padelSheet(p = {}, occ) {
@@ -613,15 +619,18 @@ function padelSheet(p = {}, occ) {
     <div class="row wrap" id="pt">${types.map(([k, l]) => `<button type="button" class="chip ${(p.type || "match") === k ? "ball" : ""}" data-t="${k}" style="border:0;padding:8px 14px">${l}</button>`).join("")}</div>
     <div class="row"><label class="fld" style="flex:1">Jour<input id="pd-d" type="date" value="${p.date || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
     <label class="fld" style="width:120px">Heure<input id="pd-h" type="time" value="${p.time || "19:00"}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label></div>
+    <div class="fld">Intensité<div class="row wrap" id="pi">${[["facile", "Tranquille"], ["normal", "Normale"], ["intense", "À fond"]].map(([k, l]) => `<button type="button" class="chip ${(p.int || "normal") === k ? "ball" : ""}" data-i="${k}" style="border:0;padding:8px 14px">${l}</button>`).join("")}</div>
+      <span class="small muted" style="font-weight:400">Tranquille : partenaires moins forts, échanges cool. Compte pour moitié dans la fatigue.</span></div>
     <label class="fld">Durée<select id="pd-m">${[60, 90, 120, 150, 180].map(m => `<option value="${m}" ${(+p.dur || 90) === m ? "selected" : ""}>${durLabel(m)}</option>`).join("")}</select></label>
     <label class="toggle" style="padding:10px 14px"><span><b>Toutes les semaines</b><span class="small muted" style="display:block">Même jour, même heure</span></span><input id="pd-w" type="checkbox" ${p.weekly ? "checked" : ""} style="width:24px;height:24px"></label>
     ${p.id ? `<div class="row wrap">${p.weekly && occ ? `<button class="btn sm ghost" id="pd-skip" type="button">Annuler juste le ${frDate(occ)}</button>` : ""}<button class="btn sm danger" id="pd-del" type="button">Supprimer${p.weekly ? " toutes les semaines" : ""}</button></div>` : ""}`, async () => {
     const date = $("#pd-d").value; if (!date) { toast("Choisis un jour"); return false; }
     const type = $("#pt .chip.ball")?.dataset.t || "match";
-    const item = { id: p.id || "pd" + Date.now(), type, date, time: $("#pd-h").value, dur: +$("#pd-m").value, weekly: $("#pd-w").checked, wd: (parseISO(date).getDay() + 6) % 7, skip: p.skip || [] };
+    const item = { id: p.id || "pd" + Date.now(), type, int: $("#pi .chip.ball")?.dataset.i || "normal", date, time: $("#pd-h").value, dur: +$("#pd-m").value, weekly: $("#pd-w").checked, wd: (parseISO(date).getDay() + 6) % 7, skip: p.skip || [] };
     S.padel = (S.padel || []).filter(x => x.id !== item.id); S.padel.push(item);
     await Store.set("padel", S.padel).catch(() => toast("Sauvegarde impossible")); toast(PTYPES[type] + " ajouté");
   }, renderHome);
+  $("#pi").onclick = e => { const b = e.target.closest("[data-i]"); if (!b) return; $("#pi").querySelectorAll(".chip").forEach(c => c.classList.toggle("ball", c === b)); };
   $("#pt").onclick = e => { const b = e.target.closest("[data-t]"); if (!b) return; $("#pt").querySelectorAll(".chip").forEach(c => c.classList.toggle("ball", c === b)); };
   const del = $("#pd-del"); if (del) del.onclick = async () => { S.padel = S.padel.filter(x => x.id !== p.id); await Store.set("padel", S.padel).catch(() => {}); $("#modal").classList.remove("on"); renderHome(); };
   const sk = $("#pd-skip"); if (sk) sk.onclick = async () => { const x = S.padel.find(x => x.id === p.id); x.skip = [...(x.skip || []), occ]; await Store.set("padel", S.padel).catch(() => {}); $("#modal").classList.remove("on"); renderHome(); };
@@ -712,7 +721,7 @@ function renderSession(key) {
     <div><div class="eyebrow">${p.title} · S${wi.cw} · Bloc ${wi.bloc + 1}${wi.deload ? " · allégée" : ""}${wi.tournament ? " · tournoi" : ""}</div><h1>${p.sub}</h1></div>
     ${(() => { const f = sessionFit(key, isoDate(new Date())); return !f.ok ? `<div class="notice small"><b>À éviter aujourd'hui</b> : ${esc(f.why)}. Regarde « Ta semaine » pour le meilleur jour.</div>` : f.pen >= 3 ? `<div class="notice small">Attention : ${esc(f.why)}. Écoute tes jambes et garde de la marge.</div>` : ""; })()}
     ${wi.fatigue && !wi.deload && !wi.tournament ? `<div class="notice info small">Padel aujourd'hui ou grosse séance hier : une série de moins par exercice.</div>` : ""}
-    ${key === "C" && wi.padelWeek >= 180 ? `<div class="notice info small">Tu as ${durLabel(wi.padelWeek)} de padel cette semaine : le cardio de fin est divisé par deux.</div>` : ""}
+    ${key === "C" && wi.padelWeek >= 180 ? `<div class="notice info small">Tu as beaucoup de padel cette semaine : le cardio de fin est divisé par deux.</div>` : ""}
     ${p.warning ? `<div class="notice ${key === "A" ? "" : "info"} small">${p.warning}</div>` : ""}
     <details class="warm" ${warmDone < WARMUP.length ? "open" : ""}>
       <summary><h3>Échauffement</h3><span class="chip ${warmDone === WARMUP.length ? "good" : ""}" id="wcount">${warmDone}/${WARMUP.length}</span></summary>
