@@ -1131,6 +1131,15 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && T.
     Store.lsSet("logs", [{ session: "A", date: "2026-11-16T18:00:00.000Z", week: 1, bloc: 1, deload: false, tournament: false, cycleStart: "2026-11-16", durationMin: 65, entries: {}, _id: "log-seed-a" }]);
     Store.lsSet("seeded", true);
   }
+  if (Store.mode === "local" && !Store.lsGet("seedA2")) {
+    // Charges de la séance A du 16/11/2026
+    const S_ = (n, kg, reps) => Array.from({ length: n }, () => ({ kg, reps, done: true }));
+    const entries = { boxjump: S_(4, null, null), squat: S_(4, 70, 8), bulgare: S_(3, 8, 12), rdl: S_(3, 60, 12), fentelat: S_(3, 16, 6), mollets: S_(3, null, null), pallof: S_(3, 6, 10) };
+    const logs = Store.lsGet("logs") || [];
+    const l = logs.find(x => x._id === "log-seed-a");
+    if (l && !Object.keys(l.entries || {}).length) { l.entries = entries; Store.lsSet("logs", logs); }
+    Store.lsSet("seedA2", true);
+  }
   try {
     const [settings, current, tests, logs] = await Promise.all([Store.get("settings"), Store.get("current"), Store.get("tests"), Store.logs()]);
     S.comp = (await Store.get("comp")) || seedComp(); if (!(await Store.get("comp"))) Store.set("comp", S.comp);
