@@ -158,6 +158,25 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--chalk); transition: transform .15s; }
 .sw[aria-checked="true"] { background: var(--ball); }
 .sw[aria-checked="true"]::after { transform: translateX(22px); background: var(--ball-ink); }
+.react { position: fixed; inset: 0; z-index: 40; background: var(--court); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+.react.on { display: flex; }
+.react .r-arrow { font-size: min(52vw, 260px); line-height: 1; font-weight: 700; color: var(--ball); }
+.react .r-arrow.flash { animation: rflash .25s ease-out; }
+@keyframes rflash { from { transform: scale(.7); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+.react.rest .r-arrow { color: var(--muted); font-size: 90px; }
+.react .r-word { font-family: var(--display); font-size: 34px; font-weight: 700; min-height: 40px; }
+.react .r-info { color: var(--muted); font-size: 15px; }
+.react .r-time { font-family: var(--display); font-size: 48px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.formbox { background: var(--court-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 10px; }
+.formbox.fset { padding: 8px 12px; }
+.forms { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.fbtn { background: var(--court); border: 1.5px solid var(--line); border-radius: 10px; padding: 6px 2px; color: var(--chalk); display: grid; justify-items: center; gap: 2px; font: inherit; }
+.fbtn span { font-size: 22px; line-height: 1.1; }
+.fbtn small { font-size: 11px; color: var(--muted); }
+.fbtn.on { border-color: var(--ball); background: var(--court-3); }
+.fbtn.on small { color: var(--ball); }
+.formbox.fset .fbtn:not(.on) { opacity: .55; }
+.wchart svg { width: 100%; height: auto; display: block; }
 .modal { position: fixed; inset: 0; background: rgba(5,12,20,.7); display: none; align-items: flex-end; justify-content: center; z-index: 30; padding: 16px; }
 .modal.on { display: flex; }
 .sheet { background: var(--court-2); border: 1px solid var(--line); border-radius: 18px; padding: 18px; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 12px; margin-bottom: env(safe-area-inset-bottom); }
@@ -183,6 +202,14 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 <body>
 <main class="app" id="app"><p class="muted">Chargement de ton programme…</p></main>
 
+<div class="react" id="react" role="dialog" aria-live="assertive">
+  <div class="r-info" id="r-info"></div>
+  <div class="r-arrow" id="r-arrow">●</div>
+  <div class="r-word" id="r-word"></div>
+  <div class="r-time" id="r-time"></div>
+  <div class="row"><button class="btn ghost" id="r-stop" type="button">Arrêter</button><button class="btn" id="r-skip" type="button">Passer ›</button></div>
+</div>
+
 <div class="dock">
   <div class="timer" id="timer" role="timer" aria-live="polite">
     <div class="t" id="tval">0:00</div>
@@ -202,6 +229,9 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 "use strict";
 const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
@@ -352,11 +382,97 @@ const PROGRAM = {
     ]
   }
 };
+PROGRAM.M = {
+  title: "Séance M", sub: "Motricité à la maison", dur: "20-25 min", home: true,
+  warning: "Balle de tennis + élastiques, 2 m × 2 m et un bout de mur suffisent. Faisable même un jour de padel, sauf jour de tournoi. Idéal : 2 à 3 fois par semaine.",
+  warmup: [
+    ["Sautillements sur place", "1 min", "Petits rebonds sur l'avant des pieds, de plus en plus vifs."],
+    ["Hanches en 90/90", "5 / côté", "Assis, jambes pliées à 90°, bascule les genoux d'un côté à l'autre sans les mains."],
+    ["Genou au mur", "10 / côté", "Pied à 10 cm du mur, le genou touche le mur sans décoller le talon."],
+    ["Rotations du haut du dos", "8 / côté", "À quatre pattes, main derrière la tête, ferme puis ouvre le coude vers le plafond."],
+    ["Fentes latérales poids du corps", "8 / côté", "Grand pas de côté, fesses en arrière, l'autre jambe tendue."]
+  ],
+  groups: [
+    { name: "Bloc 1 · Appuis et réaction", items: [
+      { id: "m-ligne", name: "Pieds rapides sur une ligne", sets: same(3), reps: same("20 s"), rest: 30, kind: "check",
+        why: "Fréquence d'appuis",
+        how: "Prends un joint de carrelage ou une ligne de parquet. 20 s à fond, une variante par série : 1) sauts latéraux pieds joints, 2) avant-arrière, 3) un pied de chaque côté en ciseaux.",
+        cues: ["Sur l'avant du pied, le plus de contacts possible.", "Petits sauts, regard devant toi."] },
+      { id: "m-chasse", name: "Pas chassés élastique", unit: "/ côté", sets: same(3), reps: same("10 pas"), rest: 30, kind: "check",
+        why: "Fessier moyen, déplacement latéral",
+        how: "Élastique autour des chevilles (ou juste au-dessus des genoux). Position de défense, genoux fléchis : 3-4 pas chassés d'un côté, autant pour revenir, jusqu'à 10 pas par côté. Pas de place du tout ? Fais-les sur place : un pied s'écarte contre l'élastique, l'autre suit.",
+        cues: ["Les pieds ne se touchent jamais.", "Hauteur constante, pas de balancier du buste."],
+        bloc: ["Élastique léger.", "Élastique moyen.", "Élastique fort, plus bas sur les jambes."],
+        video: yt("lateral band walk") },
+      { id: "m-react", name: "Réaction : split-step + déplacement", sets: [4, 5, 6], reps: same("20 s"), rest: 40, kind: "react",
+        why: "Lire, réagir, partir vite",
+        how: "Pose le téléphone à 1,5-2 m devant toi (sur une chaise ou contre un mur). Petits rebonds sur place. À chaque bip, une flèche apparaît : split-step, puis UN grand pas explosif dans cette direction (fente avant, pas croisé de côté, pas en arrière) en faisant le geste de frappe, et retour au centre. 2 m × 2 m suffisent.",
+        cues: ["Toujours un split-step avant de partir.", "Buste bas, premier pas explosif.", "Flèche vers le bas = recule comme sur un lob."],
+        bloc: ["4 directions, signal toutes les 2 s environ.", "8 directions (diagonales en plus).", "8 directions, signaux plus rapprochés."],
+        video: yt("padel split step footwork") }
+    ] },
+    { name: "Bloc 2 · Équilibre et chevilles", items: [
+      { id: "m-equi", name: "Équilibre une jambe + balle", unit: "/ jambe", sets: same(3), reps: same("30 s"), rest: 20, kind: "check",
+        why: "Chevilles, prévention des entorses",
+        how: "Sur une jambe, genou légèrement fléchi, à 1-2 m d'un mur. Lance la balle de tennis contre le mur et rattrape-la sans poser l'autre pied.",
+        cues: ["Pied ancré, orteils détendus."],
+        bloc: ["Pied nu au sol, balle à deux mains.", "Une seule main, lancers plus vifs.", "Sur un coussin plié, ou yeux fermés sans balle."] },
+      { id: "m-recep", name: "Sauts avec réception une jambe", unit: "/ jambe", sets: same(3), reps: same("5"), rest: 45, kind: "check",
+        why: "Freiner et repartir",
+        how: "Petit saut (30-50 cm suffisent) en avant, de côté ou en arrière, réception sur une jambe. Tiens 2 s immobile, genou dans l'axe du pied, puis reviens au point de départ.",
+        cues: ["Réception silencieuse.", "Le genou ne rentre pas vers l'intérieur."],
+        bloc: ["Petits sauts.", "Sauts un peu plus hauts, sur place ou presque.", "Enchaîne : réception puis rebond direct dans une autre direction."],
+        video: yt("single leg hop and stick") }
+    ] },
+    { name: "Bloc 3 · Coordination et prévention", items: [
+      { id: "m-mur", name: "Balle contre le mur", sets: same(3), reps: same("45 s"), rest: 30, kind: "check",
+        why: "Œil-main, réflexes",
+        how: "Face au mur à 1,5-2 m. Lance et rattrape la balle : main droite, main gauche, puis en alternant. Rapproche-toi pour accélérer le rythme.",
+        cues: ["Rattrape devant toi, bras souples.", "Reste sur l'avant des pieds."],
+        bloc: ["Une main, puis l'autre.", "Alterné, plus près du mur.", "Lance d'une main, rattrape de l'autre, avec un petit pas chassé entre chaque."] },
+      { id: "m-rot", name: "Rotation élastique", unit: "/ côté", sets: same(3), reps: same("10"), rest: 30, kind: "check",
+        why: "Rotation du tronc des frappes",
+        how: "Élastique accroché à une poignée de porte fermée, à hauteur de poitrine. De profil, tourne les hanches puis les épaules et tire l'élastique de l'autre côté, comme un coup droit. Retour lent.",
+        cues: ["La force part des hanches.", "Aller rapide, retour en 2 s."],
+        video: yt("band rotation core") },
+      { id: "m-epaule", name: "Rotations externes élastique", unit: "/ bras", sets: same(2), reps: same("15"), rest: 20, kind: "check",
+        why: "Prévention épaule",
+        how: "Élastique léger, coude collé au corps et plié à 90°. Ouvre l'avant-bras vers l'extérieur, reviens lentement.",
+        cues: ["Très léger, lent et contrôlé."],
+        video: yt("band external rotation") }
+    ] }
+  ]
+};
+const HOME_TARGET = 2;
+
+// Échauffement guidé avant un match (au club), environ 8 min
+const PREMATCH = [
+  ["Trottiner + sautillements", 90, "Tour du terrain ou sur place. Puis petits rebonds rapides sur l'avant des pieds."],
+  ["Mobilité hanches", 60, "Fentes avant en marchant avec rotation du buste du côté de la jambe avant, puis grands cercles de genoux."],
+  ["Épaules et bras", 60, "Grands cercles de bras avant et arrière, puis rotations du buste bras ouverts. Avec élastique léger : rotations externes."],
+  ["Pas chassés + pas croisés", 60, "Le long du filet : pas chassés aller, pas croisés retour, de plus en plus vite."],
+  ["Split-step + départs", 60, "Split-step, puis départ explosif sur 2-3 m dans une direction différente à chaque fois (avant, arrière, côtés)."],
+  ["Accélérations", 45, "3 accélérations de la vitre au filet, à 70 % puis 90 %. Retour en marchant."],
+  ["Sauts réactifs", 30, "Petits sauts verticaux rapides, contacts courts, puis 5 sauts plus hauts."],
+  ["Coups à vide", 60, "Coup droit, revers, volées, bandeja, smash : gestes amples et relâchés, de plus en plus vite."]
+];
+
+// Cycles pairs : variantes pour relancer la progression (les charges sont suivies à part)
+const VARIANTS = {
+  bulgare: { id: "fentearr", name: "Fente arrière haltères", how: "Debout, un haltère dans chaque main. Grand pas en arrière, descends jusqu'à ce que le genou arrière frôle le sol, puis pousse dans le talon avant pour revenir. Toute une jambe, puis l'autre.", cues: ["Buste légèrement penché.", "Le genou avant ne rentre pas.", "Charge = poids d'un haltère."], video: yt("fente arrière haltères") },
+  rdl: { id: "rdl1", name: "Soulevé de terre roumain une jambe", unit: "/ jambe", how: "Un haltère dans la main opposée à la jambe d'appui. Penche le buste en tendant la jambe libre derrière toi, dos plat, jusqu'à l'étirement de l'ischio. Remonte en poussant la hanche.", cues: ["Bassin bien horizontal.", "Charge = poids de l'haltère."], inc: 2, video: yt("single leg romanian deadlift dumbbell") },
+  incline: { id: "inclinebarre", name: "Développé incliné barre", how: "Banc à 30°. Prise un peu plus large que les épaules, descends la barre en haut de la poitrine, pousse.", cues: ["Omoplates serrées.", "Un pareur si c'est lourd."], inc: 2.5 },
+  militaire: { id: "arnold", name: "Arnold press", how: "Assis, haltères devant le visage paumes vers toi. En poussant au-dessus de la tête, tourne les paumes vers l'avant. Redescends en sens inverse.", cues: ["Ne creuse pas le bas du dos."], video: yt("arnold press") },
+  rowing: { id: "rowpoulie", name: "Tirage horizontal poulie", how: "Assis à la poulie basse, dos droit. Tire la poignée vers le nombril en serrant les omoplates, retour lent bras tendus.", cues: ["Le buste ne bascule pas d'avant en arrière."], inc: 2.5 }
+};
+const cycleNo = () => S.settings?.cycle || 1;
+const vx = ex => cycleNo() % 2 === 0 && VARIANTS[ex.id] ? { ...ex, ...VARIANTS[ex.id] } : ex;
 const BLOCS = ["Base", "Force", "Puissance"];
 const ORDER = ["A", "B", "C"];
 const TESTS = [
   ["jump", "Détente verticale", "cm · My Jump ou marque au mur"],
   ["agility", "Agilité 5-10-5", "s · chronométré"],
+  ["spider", "Spider drill padel", "s · sur le terrain"],
   ["squat5", "Squat", "kg × 5 rép. propres"],
   ["pullups", "Tractions", "rép. max"],
   ["waist", "Tour de taille", "cm · au nombril, à jeun"],
@@ -378,46 +494,83 @@ const restLabel = s => s >= 60 ? (s % 60 ? Math.floor(s / 60) + " min " + (s % 6
 function repRange(r) { const m = String(r).match(/^(\d+)(?:-(\d+))?$/); return m ? { lo: +m[1], hi: +(m[2] || m[1]) } : null; }
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 2200); }
 
+const FB_CONFIG = {
+  apiKey: "AIzaSyA7x3KLGCIVF8fWZrZ_JwJnSRKAyI0WEA0",
+  authDomain: "les-mimichats.firebaseapp.com",
+  projectId: "les-mimichats",
+  storageBucket: "les-mimichats.firebasestorage.app",
+  messagingSenderId: "564623606130",
+  appId: "1:564623606130:web:463f4d42b7e3748f2a5deb"
+};
+const SYNC_KEYS = ["settings", "current", "tests", "padel", "comp", "weights"];
+// Synchro Firebase (projet « les-mimichats », même compte que l'appli de couple).
+// Firestore refuse les tableaux imbriqués : chaque valeur est stockée en texte JSON.
+// localStorage reste toujours à jour : l'appli marche hors ligne et sans compte.
 const Store = {
-  mode: "local", base: null, logsCol: null,
+  mode: "local", db: null, auth: null, user: null, base: null, logsCol: null, syncError: null,
   async init() {
+    if (typeof firebase === "undefined") return;
     try {
-      const db = await claude.use("db"); const user = await claude.use("user");
-      const uid = user ? await user.id() : null;
-      if (db && uid) {
-        this.base = db.collection("data/users/" + uid);
-        this.logsCol = db.doc("data/users/" + uid + "/journal").collection("logs");
-        this.mode = "db";
-      }
-    } catch (e) { this.mode = "local"; }
+      firebase.apps.length || firebase.initializeApp(FB_CONFIG);
+      this.auth = firebase.auth(); this.db = firebase.firestore();
+      try { await this.db.enablePersistence({ synchronizeTabs: true }); } catch (e) {}
+      const user = await new Promise(res => { const off = this.auth.onAuthStateChanged(u => { off(); res(u); }); setTimeout(() => res(this.auth.currentUser), 6000); });
+      if (!user) return;
+      this.user = user;
+      this.base = this.db.collection("sallePadel").doc(user.uid).collection("data");
+      this.logsCol = this.db.collection("sallePadel").doc(user.uid).collection("logs");
+      const probe = await this.withTimeout(this.base.doc("settings").get());
+      this.mode = "db";
+      if (!probe.exists && this.lsGet("settings")) await this.upload();
+    } catch (e) {
+      this.mode = "local";
+      this.syncError = e && (e.code === "permission-denied" || e.code === "firestore/permission-denied") ? "rules" : e && e.code === "timeout" ? "offline" : "other";
+    }
+  },
+  // Premier branchement : envoie tout ce qui est sur le téléphone vers le compte
+  async upload() {
+    const batch = this.db.batch();
+    for (const k of SYNC_KEYS) { const v = this.lsGet(k); if (v != null) batch.set(this.base.doc(k), { json: JSON.stringify(v), at: Date.now() }); }
+    for (const l of this.lsGet("logs") || []) { const { _id, ...log } = l; batch.set(this.logsCol.doc(_id || "log-" + Date.parse(l.date)), { date: log.date, json: JSON.stringify(log) }); }
+    await this.withTimeout(batch.commit());
   },
   lsGet(k) { try { return JSON.parse(localStorage.getItem("padelapp2:" + k)); } catch (e) { return null; } },
   lsSet(k, v) { try { v == null ? localStorage.removeItem("padelapp2:" + k) : localStorage.setItem("padelapp2:" + k, JSON.stringify(v)); } catch (e) {} },
-  withTimeout(p) { return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: "timeout" }), 10000))]); },
+  withTimeout(p, ms = 10000) { return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: "timeout" }), ms))]); },
   async get(k) {
-    if (this.mode === "db") { const s = await this.withTimeout(this.base.doc(k).get()); return s.exists ? s.data() : null; }
+    if (this.mode === "db") {
+      try { const s = await this.withTimeout(this.base.doc(k).get()); const v = s.exists ? JSON.parse(s.data().json) : null; this.lsSet(k, v); return v; }
+      catch (e) { return this.lsGet(k); }
+    }
     return this.lsGet(k);
   },
   queues: {},
   set(k, v) {
-    if (this.mode !== "db") { this.lsSet(k, v); return Promise.resolve(); }
+    this.lsSet(k, v);
+    if (this.mode !== "db") return Promise.resolve();
     const prev = this.queues[k] || Promise.resolve();
-    const run = prev.catch(() => {}).then(() => v == null ? this.base.doc(k).delete() : this.base.doc(k).set(JSON.parse(JSON.stringify(v))));
+    // set() est appliqué tout de suite au cache hors ligne ; on n'attend pas le serveur
+    const run = prev.catch(() => {}).then(() => { const w = v == null ? this.base.doc(k).delete() : this.base.doc(k).set({ json: JSON.stringify(v), at: Date.now() }); w.catch(() => {}); });
     this.queues[k] = run; return run;
   },
   async logs() {
-    if (this.mode === "db") { const q = await this.withTimeout(this.logsCol.orderBy("date", "desc").limit(400).get()); return q.docs.map(d => ({ ...d.data(), _id: d.id })); }
+    if (this.mode === "db") {
+      try {
+        const q = await this.withTimeout(this.logsCol.orderBy("date", "desc").limit(500).get());
+        const list = q.docs.map(d => ({ ...JSON.parse(d.data().json), _id: d.id })); this.lsSet("logs", list); return list;
+      } catch (e) {}
+    }
     return (this.lsGet("logs") || []).slice().sort((a, b) => b.date.localeCompare(a.date));
   },
   async addLog(log) {
     const id = "log-" + Date.now();
-    if (this.mode === "db") { await this.logsCol.doc(id).set(log); }
-    else { const l = this.lsGet("logs") || []; l.push({ ...log, _id: id }); this.lsSet("logs", l); }
+    const l = this.lsGet("logs") || []; l.push({ ...log, _id: id }); this.lsSet("logs", l);
+    if (this.mode === "db") this.logsCol.doc(id).set({ date: log.date, json: JSON.stringify(log) }).catch(() => {});
     return id;
   },
   async delLog(id) {
-    if (this.mode === "db") await this.logsCol.doc(id).delete();
-    else this.lsSet("logs", (this.lsGet("logs") || []).filter(l => l._id !== id));
+    this.lsSet("logs", (this.lsGet("logs") || []).filter(l => l._id !== id));
+    if (this.mode === "db") this.logsCol.doc(id).delete().catch(() => {});
   }
 };
 
@@ -433,16 +586,19 @@ function weekInfo(date = new Date()) {
   const iso = isoDate(date), mon = isoDate(mondayOf(date));
   const padelWeek = Array.from({ length: 7 }, (_, i) => padelMin(plusDays(mon, i))).reduce((a, b) => a + b, 0);
   const fatigue = padelMin(iso) >= 90 || padelMin(plusDays(iso, -1)) >= 120;
-  return { week, cw, bloc, deload: cw % 4 === 0, over: week > 12, notStarted: w < 1, tournament: (S.settings.tournamentWeeks || []).includes(week) || compTournamentWeek(date), padelWeek, fatigue };
+  const form = S.current?.form ?? null, lowForm = form != null && form <= 2;
+  return { week, cw, bloc, deload: cw % 4 === 0, over: week > 12, notStarted: w < 1, tournament: (S.settings.tournamentWeeks || []).includes(week) || compTournamentWeek(date), padelWeek, fatigue, form, lowForm };
 }
 function presc(ex, wi) {
   let sets = ex.sets[wi.bloc];
   if (ex.kind !== "interval") {
     if (wi.deload) sets = Math.max(2, Math.round(sets * 0.6));
     if (wi.tournament) sets = Math.max(1, Math.ceil(sets / 2));
-    if (wi.fatigue && !wi.deload && !wi.tournament) sets = Math.max(2, sets - 1);
+    if ((wi.fatigue || wi.lowForm) && !wi.deload && !wi.tournament) sets = Math.max(2, sets - 1);
+    if (wi.form === 1) sets = Math.max(1, sets - 1);
   } else {
-    if (wi.deload || wi.tournament) sets = Math.max(4, Math.round(sets * (wi.tournament ? 0.5 : 0.6)));
+    if (wi.lowForm) sets = Math.max(4, Math.round(sets * 0.6));
+    else if (wi.deload || wi.tournament) sets = Math.max(4, Math.round(sets * (wi.tournament ? 0.5 : 0.6)));
     else if (wi.padelWeek >= 180) sets = Math.max(4, Math.round(sets * 0.5));
   }
   return { sets, reps: ex.reps[wi.bloc] };
@@ -453,10 +609,18 @@ function lastFor(exId) {
 }
 function doneThisWeek(wi) {
   const set = new Set();
-  for (const l of S.logs) if (l.week === wi.week && l.cycleStart === S.settings.startDate) set.add(l.session);
+  for (const l of S.logs) if (l.week === wi.week && l.cycleStart === S.settings.startDate && ORDER.includes(l.session)) set.add(l.session);
   return set;
 }
-function allItems(key) { return PROGRAM[key].groups.flatMap(g => g.items); }
+const homeOn = iso => S.logs.some(l => l.session === "M" && isoDate(new Date(l.date)) === iso);
+function homeThisWeek() {
+  const mon = isoDate(mondayOf(new Date()));
+  return S.logs.filter(l => l.session === "M" && isoDate(new Date(l.date)) >= mon).length;
+}
+function baseItems(key) { return PROGRAM[key].groups.flatMap(g => g.items); }
+function sessItems(key) { return baseItems(key).map(vx); }
+// Tous les exercices possibles (base + variantes), pour l'historique
+function allItems(key) { if (!PROGRAM[key]) return []; const b = baseItems(key); return [...b, ...b.filter(e => VARIANTS[e.id]).map(e => ({ ...e, ...VARIANTS[e.id] }))]; }
 
 const app = $("#app");
 function setTab(t) { document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === t)); }
@@ -537,6 +701,7 @@ function sessionFit(k, iso) {
   const tomReal = tom.filter(p => !EASY(p)), tomEasy = tom.filter(EASY);
   const name = l => l.map(p => PTYPES[p.type].toLowerCase() + (EASY(p) ? " tranquille" : "")).join(" + ");
   if (today.some(p => p.type === "tournoi")) return { ok: false, why: "jour de tournoi" };
+  if (k === "M") return tom.some(p => p.type === "tournoi") ? { ok: true, pen: 3, why: "tournoi demain : fais juste l'équilibre et la balle au mur" } : { ok: true, pen: 0, why: "" };
   if (k === "A") {
     if (tomReal.length) return { ok: false, why: `${name(tomReal)} demain : garde 48 h entre jambes lourdes et padel` };
     if (today.some(HARD)) return { ok: false, why: "match le même jour" };
@@ -567,7 +732,7 @@ function planWeek(wi) {
   const mon = isoDate(mondayOf(new Date())), todayIso = isoDate(new Date());
   const days = Array.from({ length: 7 }, (_, i) => plusDays(mon, i));
   const done = doneThisWeek(wi);
-  const doneDay = {}; for (const l of S.logs) if (l.week === wi.week && l.cycleStart === S.settings.startDate) doneDay[isoDate(new Date(l.date))] = l.session;
+  const doneDay = {}; for (const l of S.logs) if (l.week === wi.week && l.cycleStart === S.settings.startDate && ORDER.includes(l.session)) doneDay[isoDate(new Date(l.date))] = l.session;
   let todo = ORDER.filter(k => !done.has(k) && !(wi.tournament && k === "A"));
   const free = days.filter(d => d >= todayIso && !doneDay[d]);
   const fixed = {}; if (S.current && todo.includes(S.current.session)) { fixed[todayIso] = S.current.session; todo = todo.filter(k => k !== S.current.session); }
@@ -604,7 +769,8 @@ function padelWeekHtml(wi) {
     return `<div class="pday ${isToday ? "today" : ""} ${past ? "past" : ""}">
       <div class="pd-h">${WD[i]}<b>${parseISO(d).getDate()}</b></div>
       ${pad.map(p => `<button class="pp ${HARD(p) ? "hard" : ""} ${EASY(p) ? "easy" : ""}" type="button" ${p.fromComp ? `onclick="location.hash='#competition'"` : `data-pad="${p.id}" data-occ="${d}"`}>${{ match: "Match", entrainement: "Entraîn.", cours: "Cours", tournoi: "Tournoi" }[p.type]}<small>${p.type === "tournoi" ? "" : durLabel(+p.dur) + (EASY(p) ? " · cool" : p.int === "intense" ? " · dur" : "")}</small></button>`).join("")}
-      ${gym ? `<a class="pg ${P.doneDay[d] ? "done" : ""}" href="#seance-${gym.toLowerCase()}">${gym}${P.doneDay[d] ? " ✓" : ""}</a>` : !pad.length && !past ? `<span class="pr">repos</span>` : ""}
+      ${gym ? `<a class="pg ${P.doneDay[d] ? "done" : ""}" href="#seance-${gym.toLowerCase()}">${gym}${P.doneDay[d] ? " ✓" : ""}</a>` : !pad.length && !past && !homeOn(d) ? `<span class="pr">repos</span>` : ""}
+      ${homeOn(d) ? `<a class="pg done" href="#historique">M ✓</a>` : ""}
     </div>`;
   }).join("");
   const tip = P.unplaced.length ? `<div class="notice small">Pas de bon créneau cette semaine pour la séance ${P.unplaced.join(" et ")} avec ton padel prévu. Saute-la, ou fais-la en allégeant.</div>` : "";
@@ -666,22 +832,31 @@ function renderHome() {
   const recent = S.logs.slice(0, 3).map(l => `<div class="row between small"><span>${frDate(l.date)} · Séance ${l.session}</span><span class="muted">S${l.week}${l.durationMin ? " · " + l.durationMin + " min" : ""}</span></div>`).join("");
   app.innerHTML = `
   <div class="stack">
-    ${wi.over ? `<div class="notice">Tes 12 semaines sont terminées. Fais tes tests de la semaine 12, puis relance un cycle dans Réglages.</div>` : ""}
+    ${wi.over ? `<div class="notice">Tes 12 semaines sont terminées. Fais tes tests de la semaine 12, puis lance le cycle ${cycleNo() + 1} : ${(cycleNo() + 1) % 2 === 0 ? "quelques exercices changent pour relancer la progression, " : "retour aux exercices du cycle 1, "}tes charges repartent de tes dernières séances.<button class="btn primary block" id="next-cycle" type="button" style="margin-top:10px">Lancer le cycle ${cycleNo() + 1}</button></div>` : ""}
     <section class="week-head">
-      <div class="eyebrow">Bloc ${wi.bloc + 1} · ${BLOCS[wi.bloc]}</div>
+      <div class="eyebrow">${cycleNo() > 1 ? "Cycle " + cycleNo() + " · " : ""}Bloc ${wi.bloc + 1} · ${BLOCS[wi.bloc]}</div>
       <div class="row" style="align-items:baseline;gap:8px;margin-top:6px"><span class="big num">S${wi.cw}</span><span class="muted">/ 12</span></div>
       ${weekBar(wi)}
       ${chips.length ? `<div class="row wrap" style="margin-top:12px">${chips.join("")}</div>` : ""}
     </section>
     ${PW.html}
+    ${(() => { const today = padelOn(P.todayIso); const m = today.find(p => p.type === "match" || p.type === "tournoi");
+      return `<button class="btn ${m ? "primary" : "ghost"} block" id="prematch" type="button">Échauffement avant-match · 8 min${m ? " (" + (m.type === "tournoi" ? "tournoi" : "match") + " aujourd'hui)" : ""}</button>`; })()}
+    ${!weekWeight() ? `<a class="notice info small" href="#tests" style="display:block;text-decoration:none;color:inherit">⚖️ Pense à ta pesée de la semaine (prise de masse) ›</a>` : ""}
     <div class="row between"><h2>${headTxt}</h2><span class="small muted">${done.size}/${order.length} faites</span></div>
     ${cards}
+    ${(() => { const h = homeThisWeek(), m = PROGRAM.M; return `<a class="sess" href="#seance-m">
+      <div class="letter">M</div>
+      <div><h3>${m.sub}</h3><div class="small muted">${m.dur} · ${h}/${HOME_TARGET} cette semaine</div></div>
+      ${S.current?.session === "M" ? `<span class="chip ball">En cours</span>` : h >= HOME_TARGET ? `<span class="chip good">${h} faite${h > 1 ? "s" : ""}</span>` : `<span class="arrow">›</span>`}</a>`; })()}
     ${wi.deload ? `<div class="notice info small">Semaine allégée : mêmes exercices et mêmes charges, moins de séries. C'est aussi la semaine des tests.</div>` : ""}
     <div class="toggle"><div><b>Semaine de tournoi</b><div class="small muted">Saute la séance A, B et C à moitié du volume.</div></div><button class="sw" id="tw" role="switch" aria-checked="${wi.tournament}" aria-label="Semaine de tournoi"></button></div>
     ${recent ? `<div class="stack" style="gap:6px"><h3>Dernières séances</h3>${recent}</div>` : ""}
-    <p class="sync">${Store.mode === "db" ? "Sauvegardé sur ton compte Claude, sur tous tes appareils." : "Sauvegarde sur cet appareil uniquement."}</p>
+    <p class="sync">${Store.mode === "db" ? "Synchronisé sur ton compte, sur tous tes appareils." : "Sauvegarde sur cet appareil uniquement."}</p>
   </div>`;
   $("#pad-add").onclick = () => padelSheet();
+  $("#prematch").onclick = () => startGuided(PREMATCH);
+  const nc = $("#next-cycle"); if (nc) nc.onclick = () => newCycle();
   app.querySelectorAll("[data-pad]").forEach(b => b.onclick = () => padelSheet(S.padel.find(x => x.id === b.dataset.pad), b.dataset.occ));
   $("#tw").onclick = async () => {
     const tw = new Set(S.settings.tournamentWeeks || []);
@@ -712,26 +887,36 @@ function renderSession(key) {
   const wi = weekInfo();
   const cur = S.current && S.current.session === key ? S.current : null;
   const warm = cur?.warm || [];
-  const warmDone = WARMUP.filter((_, i) => warm[i]).length;
+  const WU = p.warmup || WARMUP;
+  const warmDone = WU.filter((_, i) => warm[i]).length;
   let n = 0;
-  const groups = p.groups.map(g => `${g.name ? `<div class="block-title">${g.name}</div>` : ""}${g.items.map(ex => exCard(ex, ++n, wi, cur)).join("")}`).join("");
+  const groups = p.groups.map(g => `${g.name ? `<div class="block-title">${g.name}</div>` : ""}${g.items.map(ex => exCard(vx(ex), ++n, wi, cur)).join("")}`).join("");
   app.innerHTML = `
   <div class="stack">
     <a class="back" href="#accueil">‹ Semaine</a>
     <div><div class="eyebrow">${p.title} · S${wi.cw} · Bloc ${wi.bloc + 1}${wi.deload ? " · allégée" : ""}${wi.tournament ? " · tournoi" : ""}</div><h1>${p.sub}</h1></div>
     ${(() => { const f = sessionFit(key, isoDate(new Date())); return !f.ok ? `<div class="notice small"><b>À éviter aujourd'hui</b> : ${esc(f.why)}. Regarde « Ta semaine » pour le meilleur jour.</div>` : f.pen >= 3 ? `<div class="notice small">Attention : ${esc(f.why)}. Écoute tes jambes et garde de la marge.</div>` : ""; })()}
-    ${wi.fatigue && !wi.deload && !wi.tournament ? `<div class="notice info small">Padel aujourd'hui ou grosse séance hier : une série de moins par exercice.</div>` : ""}
+    ${formHtml(cur)}
+    ${wi.lowForm ? `<div class="notice small">Forme basse : ${wi.form === 1 ? "deux séries de moins" : "une série de moins"} par exercice, mêmes charges ou un cran en dessous. Si ça ne passe vraiment pas, une séance M ou du repos valent mieux.</div>` : ""}
+    ${wi.fatigue && !wi.lowForm && !wi.deload && !wi.tournament ? `<div class="notice info small">Padel aujourd'hui ou grosse séance hier : une série de moins par exercice.</div>` : ""}
     ${key === "C" && wi.padelWeek >= 180 ? `<div class="notice info small">Tu as beaucoup de padel cette semaine : le cardio de fin est divisé par deux.</div>` : ""}
     ${p.warning ? `<div class="notice ${key === "A" ? "" : "info"} small">${p.warning}</div>` : ""}
-    <details class="warm" ${warmDone < WARMUP.length ? "open" : ""}>
-      <summary><h3>Échauffement</h3><span class="chip ${warmDone === WARMUP.length ? "good" : ""}" id="wcount">${warmDone}/${WARMUP.length}</span></summary>
-      <div class="warm-list">${WARMUP.map((w, i) => `<button class="witem ${warm[i] ? "done" : ""}" data-w="${i}" type="button"><span class="box">✓</span><span class="wname">${esc(w[0])}<small>${esc(w[2])}</small></span><span class="wdose">${esc(w[1])}</span></button>`).join("")}</div>
+    <details class="warm" ${warmDone < WU.length ? "open" : ""}>
+      <summary><h3>Échauffement</h3><span class="chip ${warmDone === WU.length ? "good" : ""}" id="wcount">${warmDone}/${WU.length}</span></summary>
+      <div class="warm-list">${WU.map((w, i) => `<button class="witem ${warm[i] ? "done" : ""}" data-w="${i}" type="button"><span class="box">✓</span><span class="wname">${esc(w[0])}<small>${esc(w[2])}</small></span><span class="wdose">${esc(w[1])}</span></button>`).join("")}</div>
     </details>
     ${groups}
     <button class="btn primary block" id="finish" type="button">Terminer la séance</button>
     ${cur ? `<button class="btn ghost block" id="abandon" type="button">Abandonner</button>` : ""}
   </div>`;
   bindSession(key);
+}
+
+const FORMS = [[1, "😫", "Cuit"], [2, "😕", "Bof"], [3, "🙂", "Correct"], [4, "😀", "Bien"], [5, "💪", "Au top"]];
+function formHtml(cur) {
+  const f = cur?.form;
+  return `<div class="formbox ${f ? "fset" : ""}"><div class="small ${f ? "muted" : ""}"><b>${f ? "Forme du jour" : "Comment tu te sens ?"}</b>${f ? "" : " Sommeil, courbatures, énergie : la séance s'adapte."}</div>
+    <div class="forms">${FORMS.map(([n, e, l]) => `<button type="button" class="fbtn ${f === n ? "on" : ""}" data-form="${n}" aria-pressed="${f === n}"><span>${e}</span><small>${l}</small></button>`).join("")}</div></div>`;
 }
 
 function exCard(ex, n, wi, cur) {
@@ -753,9 +938,11 @@ function exCard(ex, n, wi, cur) {
     }
   }
   let setsHtml;
-  if (ex.kind === "check" || ex.kind === "interval") {
+  if (ex.kind === "check" || ex.kind === "interval" || ex.kind === "react") {
     const boxes = Array.from({ length: pr.sets }, (_, i) => `<button class="cbox ${entries[i]?.done ? "done" : ""}" data-ex="${ex.id}" data-i="${i}" type="button" aria-pressed="${!!entries[i]?.done}">${ex.kind === "interval" ? i + 1 : "S" + (i + 1)}</button>`).join("");
-    setsHtml = ex.kind === "interval"
+    setsHtml = ex.kind === "react"
+      ? `<button class="btn primary block" data-react="${ex.id}" type="button">Lancer les signaux · ${pr.sets} × ${esc(pr.reps)}</button><div class="checks">${boxes}</div>`
+      : ex.kind === "interval"
       ? `<button class="btn primary block" data-interval="${ex.id}" type="button">Lancer le chrono · ${pr.sets} × ${esc(pr.reps)}</button><div class="checks">${boxes}</div>`
       : `<div class="checks">${boxes}</div>`;
   } else {
@@ -790,7 +977,8 @@ function bindSession(key) {
   app.querySelectorAll(".witem").forEach(b => b.onclick = () => {
     const c = ensureCurrent(key); const i = +b.dataset.w; c.warm[i] = !c.warm[i];
     b.classList.toggle("done", !!c.warm[i]);
-    const d = WARMUP.filter((_, j) => c.warm[j]).length; const wc = $("#wcount"); wc.textContent = d + "/" + WARMUP.length; wc.classList.toggle("good", d === WARMUP.length);
+    const WU = PROGRAM[key].warmup || WARMUP;
+    const d = WU.filter((_, j) => c.warm[j]).length; const wc = $("#wcount"); wc.textContent = d + "/" + WU.length; wc.classList.toggle("good", d === WU.length);
     saveCurrent();
   });
   app.querySelectorAll("input[data-ex]").forEach(inp => inp.oninput = () => {
@@ -821,9 +1009,11 @@ function bindSession(key) {
     if (exo.kind !== "interval") afterTick(key, exo, wi, e.done); else markComplete(exo, wi);
     saveCurrent();
   });
+  app.querySelectorAll("[data-form]").forEach(b => b.onclick = () => { const c = ensureCurrent(key); const n = +b.dataset.form; c.form = c.form === n ? null : n; saveCurrent(); Store.set("current", S.current).catch(() => {}); const y = window.scrollY; renderSession(key); window.scrollTo(0, y); });
+  app.querySelectorAll("[data-react]").forEach(b => b.onclick = () => { unlockAudio(); ensureCurrent(key); startReact(findEx(key, b.dataset.react), wi); });
   app.querySelectorAll("[data-interval]").forEach(b => b.onclick = () => { unlockAudio(); ensureCurrent(key); startIntervals(key, findEx(key, b.dataset.interval), wi); });
   $("#finish").onclick = () => finishSession(key);
-  const ab = $("#abandon"); if (ab) ab.onclick = () => confirmSheet("Abandonner la séance ?", "Ce que tu as noté sera perdu.", "Abandonner", async () => { S.current = null; stopTimer(); await Store.set("current", null).catch(() => {}); location.hash = "#accueil"; });
+  const ab = $("#abandon"); if (ab) ab.onclick = () => confirmSheet("Abandonner la séance ?", "Ce que tu as noté sera perdu.", "Abandonner", async () => { S.current = null; stopTimer(); stopReact(); await Store.set("current", null).catch(() => {}); location.hash = "#accueil"; });
 }
 
 function markComplete(ex, wi) {
@@ -834,7 +1024,7 @@ function markComplete(ex, wi) {
 function afterTick(key, ex, wi, done) {
   const complete = markComplete(ex, wi);
   if (!done || !ex.rest) return;
-  const items = allItems(key); const idx = items.indexOf(ex);
+  const items = sessItems(key); const idx = items.findIndex(e => e.id === ex.id);
   const nextEx = complete ? items[idx + 1] : null;
   startTimer(ex.rest, complete ? (nextEx ? "Ensuite : " + nextEx.name : "Dernier exercice terminé") : "Repos · " + ex.name);
 }
@@ -885,21 +1075,88 @@ function runPhase() {
   tick();
 }
 
+/* ------------------------------------------------------------------ RÉACTION (flèches aléatoires) */
+const DIRS4 = [["↑", "Avance · volée"], ["↓", "Recule · lob"], ["←", "Gauche"], ["→", "Droite"]];
+const DIRS8 = [...DIRS4, ["↖", "Volée gauche"], ["↗", "Volée droite"], ["↙", "Vitre gauche"], ["↘", "Vitre droite"]];
+const R = { h: null, ex: null, wi: null, sets: 0, set: 0, phase: "", end: 0, next: 0, last: -1, n: 0, lock: null };
+function startReact(ex, wi) {
+  stopTimer();
+  const pr = presc(ex, wi);
+  Object.assign(R, { ex, wi, sets: pr.sets, set: 0, work: parseInt(pr.reps) || 20, rest: ex.rest || 40,
+    dirs: wi.bloc === 0 ? DIRS4 : DIRS8, gap: wi.bloc === 2 ? [1.1, 1.8] : [1.5, 2.5] });
+  $("#react").classList.add("on");
+  try { navigator.wakeLock?.request("screen").then(l => R.lock = l).catch(() => {}); } catch (e) {}
+  reactPhase("prep", 5);
+  clearInterval(R.h); R.h = setInterval(reactTick, 100);
+}
+function reactPhase(ph, sec) {
+  R.phase = ph; R.end = Date.now() + sec * 1000; R.cd = {};
+  const el = $("#react"); el.classList.toggle("rest", ph !== "work");
+  if (ph === "work") { R.n = 0; R.next = Date.now() + 600; $("#r-arrow").textContent = "●"; $("#r-word").textContent = "Rebonds…"; beep(0, 1100, .25); }
+  else { $("#r-arrow").textContent = "⏸"; $("#r-word").textContent = ph === "prep" ? "Place-toi face au téléphone" : "Récup · marche"; }
+  $("#r-info").textContent = ph === "work" ? `Série ${R.set + 1} / ${R.sets}` : ph === "prep" ? "Prépare-toi" : `Série ${R.set + 1} / ${R.sets} ensuite`;
+}
+function reactTick() {
+  const now = Date.now(), left = (R.end - now) / 1000;
+  $("#r-time").textContent = Math.max(0, Math.ceil(left)) + " s";
+  if (R.phase !== "work" && left <= 3.05 && left > 0 && !R.cd[Math.ceil(left)]) { R.cd[Math.ceil(left)] = 1; beep(0, 520, .08); }
+  if (R.phase === "work" && now >= R.next && left > 0.8) {
+    let i; do { i = Math.floor(Math.random() * R.dirs.length); } while (i === R.last && R.dirs.length > 1);
+    R.last = i; R.n++;
+    const a = $("#r-arrow"); a.textContent = R.dirs[i][0]; a.classList.remove("flash"); void a.offsetWidth; a.classList.add("flash");
+    $("#r-word").textContent = R.dirs[i][1]; beep(0, 950, .12);
+    R.next = now + (R.gap[0] + Math.random() * (R.gap[1] - R.gap[0])) * 1000;
+  }
+  if (left > 0) return;
+  if (R.phase === "work") {
+    if (S.current) { const c = S.current; c.entries[R.ex.id] = c.entries[R.ex.id] || []; c.entries[R.ex.id][R.set] = { done: true };
+      const b = app.querySelector(`.cbox[data-ex="${R.ex.id}"][data-i="${R.set}"]`); if (b) { b.classList.add("done"); b.setAttribute("aria-pressed", "true"); }
+      markComplete(R.ex, R.wi); saveCurrent(); }
+    R.set++;
+    if (R.set >= R.sets) { beep(0, 660, .5); stopReact(); toast(`Réaction terminée`); return; }
+    beep(0, 700, .25); reactPhase("rest", R.rest);
+  } else reactPhase("work", R.work);
+}
+function startGuided(steps) {
+  stopTimer(); stopReact(); unlockAudio();
+  Object.assign(R, { guided: steps, gi: -1 });
+  $("#react").classList.add("on", "rest");
+  try { navigator.wakeLock?.request("screen").then(l => R.lock = l).catch(() => {}); } catch (e) {}
+  const total = steps.reduce((a, s) => a + s[1], 0);
+  const next = () => {
+    R.gi++; if (R.gi >= steps.length) { beep(0, 660, .5); beep(.3, 880, .5); stopReact(); toast("Échauffé, bon match !"); return; }
+    const [n, sec, d] = steps[R.gi]; R.end = Date.now() + sec * 1000; R.cd = {};
+    $("#r-info").textContent = `Étape ${R.gi + 1} / ${steps.length} · ${Math.round(total / 60)} min au total`;
+    $("#r-arrow").textContent = R.gi + 1; $("#r-word").innerHTML = `${esc(n)}<div class="small muted" style="font-family:var(--body);font-weight:400;font-size:16px;max-width:420px;margin:10px auto 0">${esc(d)}</div>`;
+    beep(0, 1000, .2);
+  };
+  clearInterval(R.h); next();
+  R.h = setInterval(() => {
+    const left = (R.end - Date.now()) / 1000;
+    $("#r-time").textContent = mmss(Math.max(0, left));
+    if (left <= 3.05 && left > 0 && !R.cd[Math.ceil(left)]) { R.cd[Math.ceil(left)] = 1; beep(0, 520, .08); }
+    if (left <= 0) next();
+  }, 200);
+}
+function stopReact() { clearInterval(R.h); R.h = null; $("#react").classList.remove("on", "rest"); R.guided = null; try { R.lock?.release(); } catch (e) {} R.lock = null; }
+$("#r-stop").onclick = () => stopReact();
+$("#r-skip").onclick = () => { R.end = Date.now(); };
+
 function finishSession(key) {
   const c = S.current;
   const any = c && Object.values(c.entries).some(a => a.some(s => s?.done));
   if (!any) { toast("Valide au moins une série avant de terminer"); return; }
   const wi = weekInfo();
-  const items = allItems(key);
+  const items = sessItems(key);
   const missing = items.filter(ex => (c.entries[ex.id] || []).filter(s => s?.done).length < presc(ex, wi).sets).length;
   confirmSheet("Terminer la séance " + key + " ?", missing ? `${missing} exercice${missing > 1 ? "s" : ""} pas complètement validé${missing > 1 ? "s" : ""}. Elle sera quand même enregistrée.` : "Tout est validé. Bien joué.", "Enregistrer", async () => {
     const clean = {};
     for (const [k, arr] of Object.entries(c.entries)) clean[k] = (arr || []).map(s => ({ kg: s?.kg ?? null, reps: s?.reps ?? null, done: !!s?.done }));
     const log = { session: key, date: new Date().toISOString(), week: wi.week, bloc: wi.bloc + 1, deload: wi.deload, tournament: wi.tournament,
-      cycleStart: S.settings.startDate, durationMin: Math.max(1, Math.round((Date.now() - c.startedAt) / 60000)), entries: clean };
+      cycleStart: S.settings.startDate, cycle: cycleNo(), form: c.form ?? null, durationMin: Math.max(1, Math.round((Date.now() - c.startedAt) / 60000)), entries: clean };
     try {
       const id = await Store.addLog(log);
-      S.logs.unshift({ ...log, _id: id }); S.current = null; stopTimer();
+      S.logs.unshift({ ...log, _id: id }); S.current = null; stopTimer(); stopReact();
       await Store.set("current", null).catch(() => {});
       toast("Séance " + key + " enregistrée"); location.hash = "#accueil";
     } catch (e) { toast("Enregistrement impossible, réessaie"); }
@@ -914,7 +1171,7 @@ function confirmSheet(title, text, okLabel, onOk) {
   $("#m-ok").onclick = async () => { close(); await onOk(); };
 }
 
-const TRACKED = [["squat", "Squat barre"], ["bulgare", "Fente bulgare"], ["rdl", "Soulevé de terre roumain"], ["incline", "Développé incliné"], ["tractions", "Tractions (lest)"], ["militaire", "Développé militaire"], ["rowing", "Rowing"], ["couche", "Développé couché"], ["hipthrust", "Hip thrust"], ["swing", "Kettlebell swing"]];
+const TRACKED = [["squat", "Squat barre"], ["bulgare", "Fente bulgare"], ["rdl", "Soulevé de terre roumain"], ["incline", "Développé incliné"], ["tractions", "Tractions (lest)"], ["militaire", "Développé militaire"], ["rowing", "Rowing"], ["couche", "Développé couché"], ["hipthrust", "Hip thrust"], ["swing", "Kettlebell swing"], ["fentearr", "Fente arrière (cycle 2)"], ["rdl1", "SDT roumain une jambe (cycle 2)"], ["inclinebarre", "Incliné barre (cycle 2)"], ["arnold", "Arnold press (cycle 2)"], ["rowpoulie", "Tirage poulie (cycle 2)"]];
 let chartEx = "squat";
 function renderHistory() {
   const logs = S.logs;
@@ -925,7 +1182,7 @@ function renderHistory() {
       const detail = ex.kind === "load" || ex.kind === "bw" ? e.map(s => (s.kg != null ? fmt(s.kg) : "–") + (ex.noReps ? "" : "×" + (s.reps ?? "–"))).join("  ") : e.length + " série" + (e.length > 1 ? "s" : "");
       return `<div class="l"><span>${esc(ex.name)}</span><span class="num">${detail}</span></div>`;
     }).join("");
-    return `<details class="log"><summary><span class="letter">${l.session}</span><div><b>${frDate(l.date)}</b><div class="small muted">Semaine ${l.week} · Bloc ${l.bloc}${l.deload ? " · allégée" : ""}</div></div><span class="small muted">${l.durationMin || "–"} min</span></summary>
+    return `<details class="log"><summary><span class="letter">${l.session}</span><div><b>${frDate(l.date)}</b><div class="small muted">${l.session === "M" ? "Maison" : "Semaine " + l.week + " · Bloc " + l.bloc}${l.deload ? " · allégée" : ""}${l.form ? " · forme " + l.form + "/5" : ""}</div></div><span class="small muted">${l.durationMin || "–"} min</span></summary>
       <div class="log-body">${lines || "<span class='muted'>Rien de validé.</span>"}<button class="btn danger sm" data-del="${l._id}" type="button" style="align-self:flex-start;margin-top:8px">Supprimer cette séance</button></div></details>`;
   }).join("");
   app.innerHTML = `
@@ -970,17 +1227,64 @@ function drawChart() {
 }
 
 let testT = null;
+function weekWeight() { const mon = isoDate(mondayOf(new Date())); return (S.weights || []).find(w => w.date >= mon); }
+function weightTrend() {
+  const w = (S.weights || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+  if (w.length < 3) return null;
+  const last = w[w.length - 1], ref = w.find(x => (parseISO(last.date) - parseISO(x.date)) / DAY <= 35) || w[0];
+  const weeks = (parseISO(last.date) - parseISO(ref.date)) / (7 * DAY); if (weeks < 2) return null;
+  return (last.kg - ref.kg) / weeks;
+}
+function weightHtml() {
+  const ww = weekWeight(), t = weightTrend();
+  const msg = t == null ? "La tendance apparaît après 3 pesées. Pèse-toi le même jour chaque semaine, le matin à jeun."
+    : t < 0.1 ? `<b>${fmt(Math.round(t * 100) / 100)} kg/semaine</b> : tu stagnes. Pour prendre du muscle, ajoute environ 200-300 kcal par jour (une collation de plus), et vise assez de protéines.`
+    : t <= 0.5 ? `<b>+${fmt(Math.round(t * 100) / 100)} kg/semaine</b> : bon rythme de prise de masse, continue comme ça.`
+    : `<b>+${fmt(Math.round(t * 100) / 100)} kg/semaine</b> : ça monte vite. Surveille le tour de taille, tu peux réduire un peu les portions.`;
+  return `<section class="stack" style="gap:8px">
+    <h2>Pesée de la semaine</h2>
+    <div class="row"><div class="field" style="flex:1"><input id="w-kg" inputmode="decimal" placeholder="${ww ? fmt(ww.kg) : (S.weights || []).length ? fmt(S.weights[S.weights.length - 1].kg) : "kg"}" value="${ww ? fmt(ww.kg) : ""}" aria-label="Poids en kg"><span>kg</span></div>
+    <button class="btn primary" id="w-save" type="button">${ww ? "Corriger" : "Noter"}</button></div>
+    <div class="chart wchart" id="w-chart"></div>
+    <div class="notice info small">${msg}</div>
+  </section>`;
+}
+function drawWeights() {
+  const pts = (S.weights || []).slice().sort((a, b) => a.date.localeCompare(b.date)).slice(-20);
+  const el = $("#w-chart"); if (!el) return;
+  if (pts.length < 2) { el.innerHTML = `<p class="muted small" style="margin:6px">${pts.length ? "Une pesée notée (" + fmt(pts[0].kg) + " kg). La courbe apparaît dès la deuxième." : "Pas encore de pesée."}</p>`; return; }
+  const W = 340, H = 140, pl = 36, pr = 14, pt = 12, pb = 24;
+  const vs = pts.map(p => p.kg); let lo = Math.min(...vs) - 0.5, hi = Math.max(...vs) + 0.5;
+  const x = i => pl + (W - pl - pr) * (i / (pts.length - 1)); const y = v => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo));
+  const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.kg).toFixed(1)).join(" ");
+  const L = pts[pts.length - 1];
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution du poids">
+    ${[lo + .5, (lo + hi) / 2, hi - .5].map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#2C5277"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="#9DB2C6">${fmt(Math.round(t * 10) / 10)}</text>`).join("")}
+    <path d="${line}" fill="none" stroke="#F4D13D" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.kg)}" r="${i === pts.length - 1 ? 5 : 2.5}" fill="#F4D13D"/>`).join("")}
+    <text x="${W - pr}" y="${H - 6}" font-size="11" fill="#9DB2C6" text-anchor="end">${parseISO(L.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · ${fmt(L.kg)} kg</text></svg>`;
+}
+
 function renderTests() {
   const wi = weekInfo();
   app.innerHTML = `
   <div class="stack">
     <h1>Tests</h1>
+    ${weightHtml()}
+    <h2 style="margin-top:8px">Tests toutes les 4 semaines</h2>
     <p class="muted">À refaire toutes les 4 semaines, pendant la semaine allégée.${wi.deload ? " <b style='color:var(--ball)'>C'est cette semaine.</b>" : ""}</p>
     <div style="overflow-x:auto"><table class="ttable"><thead><tr><th>Test</th>${TCOLS.map(c => `<th style="text-align:center">${c[1]}</th>`).join("")}</tr></thead><tbody>
       ${TESTS.map(([id, n, u]) => `<tr><td class="n">${n}<small>${u}</small></td>${TCOLS.map(([c]) => `<td><input id="t-${id}-${c}" inputmode="decimal" data-t="${id}" data-c="${c}" value="${esc(S.tests?.[id]?.[c] ?? "")}" aria-label="${n} ${c}"></td>`).join("")}</tr>`).join("")}
     </tbody></table></div>
-    <div class="notice info small"><b>Agilité 5-10-5 :</b> 5 m à droite, 10 m à gauche, 5 m pour revenir au centre, chronométré. Prends aussi des photos de face, profil et dos, toujours avec la même lumière.</div>
+    <div class="notice info small"><b>Agilité 5-10-5 :</b> 5 m à droite, 10 m à gauche, 5 m pour revenir au centre, chronométré.<br><b>Spider drill :</b> sur une moitié de terrain, pars du centre de la ligne de service et va toucher 5 points en étoile (les deux coins du filet, les deux coins du fond, le milieu du fond), retour au centre à chaque fois. Le test qui suit ta motricité. Prends aussi des photos de face, profil et dos, toujours avec la même lumière.</div>
   </div>`;
+  drawWeights();
+  $("#w-save").onclick = async () => {
+    const kg = num($("#w-kg").value || $("#w-kg").placeholder); if (kg == null || kg < 30 || kg > 250) { toast("Entre ton poids en kg"); return; }
+    const mon = isoDate(mondayOf(new Date()));
+    S.weights = (S.weights || []).filter(w => w.date < mon); S.weights.push({ date: isoDate(new Date()), kg });
+    await Store.set("weights", S.weights).catch(() => toast("Sauvegarde impossible")); toast("Pesée notée"); renderTests();
+  };
   app.querySelectorAll("input[data-t]").forEach(inp => inp.oninput = () => {
     const { t, c } = inp.dataset; S.tests = S.tests || {}; S.tests[t] = { ...(S.tests[t] || {}), [c]: inp.value.trim() };
     clearTimeout(testT); testT = setTimeout(() => Store.set("tests", S.tests).catch(() => toast("Sauvegarde impossible")), 900);
@@ -1238,6 +1542,24 @@ function resultSheet(r = {}) {
   ["#r-c", "#r-n", "#r-pl"].forEach(s => $(s).oninput = hint); $("#r-pts").oninput = () => { $("#r-pts").dataset.touched = 1; };
 }
 
+const RULE_TXT = `match /sallePadel/{uid}/{document=**} {
+  allow read, write: if request.auth != null && request.auth.uid == uid;
+}`;
+function syncHtml() {
+  if (Store.mode === "db") return `<div class="notice info small">✅ Synchro active · ${esc(Store.user.email)}. Tes séances sont sauvegardées sur ton compte et retrouvées sur tous tes appareils.</div><button class="btn ghost block" id="sy-out" type="button">Se déconnecter</button>`;
+  if (!Store.auth) return `<div class="notice small">Synchro indisponible : pas de connexion internet au démarrage. Rouvre l'appli avec du réseau.</div>`;
+  if (Store.user && Store.syncError === "rules") return `<div class="notice small"><b>Connecté, mais Firebase refuse l'accès.</b> Ajoute cette règle dans Firebase → Firestore → Règles, à l'intérieur de <code>match /databases/{database}/documents {</code>, puis Publier :<pre style="white-space:pre-wrap;font-size:12px;margin:8px 0 0">${esc(RULE_TXT)}</pre></div><button class="btn ghost block" id="sy-out" type="button">Se déconnecter</button>`;
+  if (Store.user) return `<div class="notice small">Connecté mais la synchro n'a pas pu démarrer (réseau ?). Rouvre l'appli.</div><button class="btn ghost block" id="sy-out" type="button">Se déconnecter</button>`;
+  return `<p class="small muted" style="margin:0">Connecte-toi avec le même e-mail et mot de passe que <b>Les mimichats</b>. Ce qui est déjà sur ce téléphone est envoyé sur ton compte à la première connexion.</p>
+    <input id="sy-mail" type="email" autocomplete="username" placeholder="E-mail" style="width:100%;background:var(--court-2);color:var(--chalk);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-size:16px">
+    <input id="sy-pw" type="password" autocomplete="current-password" placeholder="Mot de passe" style="width:100%;background:var(--court-2);color:var(--chalk);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-size:16px">
+    <button class="btn primary block" id="sy-in" type="button">Se connecter</button>`;
+}
+async function newCycle() {
+  S.settings = { startDate: isoDate(mondayOf(new Date())), tournamentWeeks: [], cycle: cycleNo() + 1 };
+  await Store.set("settings", S.settings).catch(() => {}); toast("Cycle " + cycleNo() + " lancé"); location.hash = "#accueil"; route();
+}
+
 function renderSettings() {
   const wi = weekInfo();
   const opts = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${wi && wi.cw === i + 1 ? "selected" : ""}>Semaine ${i + 1}${(i + 1) % 4 === 0 ? " (allégée)" : ""}</option>`).join("");
@@ -1248,9 +1570,11 @@ function renderSettings() {
       <select id="set-week">${opts}</select></label>
     <p class="small muted" style="margin:-4px 0 0">Change-la si tu as pris du retard (blessure, vacances) : la suite du programme se recale.</p>
     <button class="btn primary block" id="set-save" type="button">Enregistrer</button>
+    <h2 style="margin-top:12px">Synchro</h2>
+    ${syncHtml()}
     <h2 style="margin-top:12px">Nouveau cycle</h2>
-    <p class="small muted" style="margin:0">Repars en semaine 1 aujourd'hui. Ton historique est conservé.</p>
-    <button class="btn ghost block" id="set-restart" type="button">Recommencer les 12 semaines</button>
+    <p class="small muted" style="margin:0">Tu es au cycle ${cycleNo()}. Repars en semaine 1 aujourd'hui : un cycle sur deux, quelques exercices changent. Historique et charges conservés.</p>
+    <button class="btn ghost block" id="set-restart" type="button">Lancer le cycle ${cycleNo() + 1}</button>
     <h2 style="margin-top:12px">Rappels</h2>
     <div class="notice info small">Charge : garde 1 à 2 répétitions en réserve. Chaque semaine, +1 répétition ou un peu de charge si la technique reste propre. Douleur au coude, à l'épaule ou au genou plus de 10 jours : on allège et on consulte.</div>
     <h2 style="margin-top:12px">Sauvegarde</h2>
@@ -1258,10 +1582,10 @@ function renderSettings() {
     <button class="btn ghost block" id="bk-copy" type="button">Copier ma sauvegarde</button>
     <textarea id="bk-in" rows="3" placeholder="Colle ici une sauvegarde pour la restaurer" style="width:100%;background:var(--court-2);color:var(--chalk);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:14px"></textarea>
     <button class="btn ghost block" id="bk-restore" type="button">Restaurer</button>
-    <p class="sync">Données sur cet appareil uniquement.</p>
+    <p class="sync">${Store.mode === "db" ? "Sauvegardé sur ton compte, sur tous tes appareils." : "Données sur cet appareil uniquement."}</p>
   </div>`;
   $("#bk-copy").onclick = async () => {
-    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: Store.lsGet("logs") || [], current: S.current, comp: S.comp, padel: S.padel });
+    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: S.logs.map(({ _id, ...l }) => ({ ...l, _id })), current: S.current, comp: S.comp, padel: S.padel, weights: S.weights });
     try { await navigator.clipboard.writeText(data); toast("Sauvegarde copiée"); }
     catch (e) { $("#bk-in").value = data; $("#bk-in").select(); toast("Copie-la depuis le champ"); }
   };
@@ -1269,7 +1593,8 @@ function renderSettings() {
     let d; try { d = JSON.parse($("#bk-in").value); } catch (e) { toast("Sauvegarde illisible"); return; }
     if (!d || !d.settings) { toast("Sauvegarde illisible"); return; }
     confirmSheet("Restaurer cette sauvegarde ?", "Elle remplace les données actuelles de l'appli.", "Restaurer", async () => {
-      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel);
+      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel); if (d.weights) Store.lsSet("weights", d.weights);
+      if (Store.mode === "db") await Store.upload().catch(() => {});
       location.reload();
     });
   };
@@ -1278,10 +1603,14 @@ function renderSettings() {
     S.settings = { ...(S.settings || {}), startDate: isoDate(new Date(mondayOf(new Date()).getTime() - (n - 1) * 7 * DAY)), tournamentWeeks: S.settings?.tournamentWeeks || [] };
     await Store.set("settings", S.settings).catch(() => toast("Sauvegarde impossible")); toast("Semaine " + n + " enregistrée"); location.hash = "#accueil";
   };
-  $("#set-restart").onclick = () => confirmSheet("Recommencer un cycle ?", "Tu repars en semaine 1 cette semaine.", "Recommencer", async () => {
-    S.settings = { startDate: isoDate(mondayOf(new Date())), tournamentWeeks: [] };
-    await Store.set("settings", S.settings).catch(() => {}); location.hash = "#accueil";
-  });
+  $("#set-restart").onclick = () => confirmSheet(`Lancer le cycle ${cycleNo() + 1} ?`, "Tu repars en semaine 1 cette semaine. Historique et charges conservés.", "Lancer", newCycle);
+  const li = $("#sy-in"); if (li) li.onclick = async () => {
+    const em = $("#sy-mail").value.trim(), pw = $("#sy-pw").value; if (!em || !pw) { toast("E-mail et mot de passe"); return; }
+    li.disabled = true; li.textContent = "Connexion…";
+    try { await Store.auth.signInWithEmailAndPassword(em, pw); toast("Connecté, je synchronise…"); setTimeout(() => location.reload(), 600); }
+    catch (e) { li.disabled = false; li.textContent = "Se connecter"; toast(e.code === "auth/network-request-failed" ? "Pas de connexion internet" : "E-mail ou mot de passe incorrect"); }
+  };
+  const lo = $("#sy-out"); if (lo) lo.onclick = () => confirmSheet("Se déconnecter ?", "Tes données restent sur ton compte et sur ce téléphone.", "Se déconnecter", async () => { await Store.auth.signOut(); location.reload(); });
 }
 
 window.addEventListener("hashchange", route);
@@ -1307,6 +1636,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && T.
   try {
     const [settings, current, tests, logs] = await Promise.all([Store.get("settings"), Store.get("current"), Store.get("tests"), Store.logs()]);
     S.padel = (await Store.get("padel")) || [];
+    S.weights = (await Store.get("weights")) || [];
     S.comp = (await Store.get("comp")) || seedComp(); if (!(await Store.get("comp"))) Store.set("comp", S.comp);
     S.settings = settings; S.current = current; S.tests = tests || {}; S.logs = logs || [];
   } catch (e) { if (Store.mode === "db") S.loadError = true; }
