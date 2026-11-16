@@ -851,6 +851,7 @@ function seedComp() {
       { id: "r5", date: "2026-11-07", name: "P25", cat: "P25", place: 12, pairs: 16, pts: 5, partner: "Valentin Neyrat", estimated: true, matches: "D V D D" }
     ],
     upcoming: [],
+    partners: [{ id: "p1", name: "Lucas Gutierrez", licence: "" }, { id: "p2", name: "Valentin Neyrat", licence: "" }],
     cuts: CUTS_DEFAULT
   };
 }
@@ -898,7 +899,31 @@ const monthLabel = ym => { const [y, m] = ym.split("-").map(Number); return new 
 function saveComp() { return Store.set("comp", S.comp).catch(() => toast("Sauvegarde impossible")); }
 let simExtra = [];
 
+function ensurePartners() {
+  const c = S.comp; if (c.partners) return;
+  const names = [...new Set([...(c.results || []), ...(c.upcoming || [])].map(r => r.partner).filter(Boolean))];
+  c.partners = names.map((n, i) => ({ id: "p" + (i + 1), name: n, licence: "" })); saveComp();
+}
+const partnerList = () => `<datalist id="plist">${(S.comp.partners || []).map(p => `<option value="${esc(p.name)}">`).join("")}</datalist>`;
+function partnerSheet(p = {}) {
+  openSheet(`<h2>${p.id ? "Modifier le partenaire" : "Nouveau partenaire"}</h2>
+    <label class="fld">Prénom et nom${inp("pa-n", "ex. Lucas Gutierrez", p.name || "")}</label>
+    <label class="fld">Numéro de licence FFT${inp("pa-l", "ex. 1234567 A", p.licence || "")}</label>
+    <label class="fld">Téléphone${inp("pa-t", "facultatif", p.phone || "", "tel")}</label>
+    <label class="fld">Classement / note${inp("pa-c", "ex. 45 000e, joue à droite", p.note || "")}</label>
+    ${p.id ? `<button class="btn danger sm" id="pa-del" type="button" style="align-self:flex-start">Supprimer ce partenaire</button>` : ""}`, async () => {
+    const name = $("#pa-n").value.trim(); if (!name) { toast("Indique un nom"); return false; }
+    const c = S.comp; const item = { id: p.id || "p" + Date.now(), name, licence: $("#pa-l").value.trim().toUpperCase(), phone: $("#pa-t").value.trim(), note: $("#pa-c").value.trim() };
+    if (p.id && p.name !== name) [...c.results, ...(c.upcoming || [])].forEach(r => { if (r.partner === p.name) r.partner = name; });
+    c.partners = (c.partners || []).filter(x => x.id !== item.id); c.partners.push(item); c.partners.sort((a, b) => a.name.localeCompare(b.name));
+    await saveComp(); toast("Partenaire enregistré");
+  });
+  const d = $("#pa-del"); if (d) d.onclick = async () => { S.comp.partners = S.comp.partners.filter(x => x.id !== p.id); await saveComp(); $("#modal").classList.remove("on"); renderComp(); };
+}
+async function copyText(t, label) { try { await navigator.clipboard.writeText(t); toast(label + " copié"); } catch (e) { toast(t); } }
+
 function renderComp() {
+  ensurePartners();
   const c = S.comp; const last = c.history[c.history.length - 1];
   const pub = nextPublication();
   const proj = countedPoints([...c.results, ...simExtra], pub);
@@ -948,6 +973,14 @@ function renderComp() {
       <div class="row"><button class="btn sm ghost" data-edit="${r.id}" type="button">Modifier</button><button class="btn sm danger" data-delr="${r.id}" type="button">Supprimer</button></div></div></details>`).join("")}
     <button class="btn ghost block" id="c-addres" type="button">+ Ajouter un résultat</button>
 
+    <div class="row between" style="margin-top:6px"><h2>Partenaires</h2><button class="btn sm" id="c-addpa" type="button">+ Partenaire</button></div>
+    ${(c.partners || []).map(p => { const rs = c.results.filter(r => r.partner === p.name); const v = rs.reduce((s, r) => s + ((r.matches || "").match(/V/g) || []).length, 0), dd = rs.reduce((s, r) => s + ((r.matches || "").match(/D/g) || []).length, 0);
+      return `<div class="ex" style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        <div class="row between"><div><h3>${esc(p.name)}</h3><div class="small muted">${rs.length} tournoi${rs.length > 1 ? "s" : ""} ensemble · ${rs.reduce((s, r) => s + r.pts, 0)} pts${v + dd ? ` · ${v} V – ${dd} D` : ""}${p.note ? " · " + esc(p.note) : ""}</div></div><button class="btn sm ghost" data-pa="${p.id}" type="button">Modifier</button></div>
+        <div class="row wrap" style="gap:8px">${p.licence ? `<button class="chip ball" data-copy="${esc(p.licence)}" type="button" style="border:0">Licence ${esc(p.licence)} · copier</button>` : `<button class="chip warn" data-pa="${p.id}" type="button" style="border:0">+ Ajouter la licence</button>`}${p.phone ? `<a class="chip" href="tel:${esc(p.phone.replace(/\s/g, ""))}" style="text-decoration:none">${esc(p.phone)}</a>` : ""}</div>
+      </div>`; }).join("") || `<p class="muted small" style="margin:0">Ajoute tes partenaires pour avoir leur licence sous la main au moment de l'inscription.</p>`}
+    ${partnerList()}
+
     <details class="how" style="border:1px solid var(--line);border-radius:var(--r)"><summary>Mettre à jour les cuts (${monthLabel(c.cuts.month)})</summary><div class="how-body">
       <p class="small muted" style="margin:0">Chaque mois, padelspeak.com publie les cuts (points mini pour chaque top). Une ligne par palier : rang puis points, sans espace dans les nombres (ex. « 10000 991 »).</p>
       <textarea id="cuts-in" rows="8" style="width:100%;background:var(--court);color:var(--chalk);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:14px">${c.cuts.rows.map(r => r[0] + " " + r[1]).join("\n")}</textarea>
@@ -961,6 +994,9 @@ function renderComp() {
   $("#c-upd").onclick = rankSheet;
   $("#c-addup").onclick = () => tourSheet();
   $("#c-addres").onclick = () => resultSheet();
+  $("#c-addpa").onclick = () => partnerSheet();
+  app.querySelectorAll("[data-pa]").forEach(b => b.onclick = () => partnerSheet(c.partners.find(x => x.id === b.dataset.pa)));
+  app.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b.dataset.copy, "Numéro de licence"));
   app.querySelectorAll("[data-res]").forEach(b => b.onclick = () => { const t = c.upcoming.find(x => x.id === b.dataset.res); resultSheet({ ...t, fromUpcoming: true }); });
   app.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => resultSheet(c.results.find(x => x.id === b.dataset.edit)));
   app.querySelectorAll("[data-delr]").forEach(b => b.onclick = () => confirmSheet("Supprimer ce résultat ?", "Il ne comptera plus dans le simulateur.", "Supprimer", async () => { c.results = c.results.filter(x => x.id !== b.dataset.delr); await saveComp(); renderComp(); }));
@@ -1011,7 +1047,7 @@ function tourSheet(t = {}) {
     <label class="fld">Date<input id="t-d" type="date" value="${t.date || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
     <label class="fld">Catégorie<select id="t-c">${CATS.map(k => `<option ${k === (t.cat || "P25") ? "selected" : ""}>${k}</option>`).join("")}</select></label>
     <label class="fld">Nom / club${inp("t-n", "ex. P25 Corbas", t.name || "")}</label>
-    <label class="fld">Partenaire${inp("t-p", "ex. Lucas Gutierrez", t.partner || "")}</label>`, async () => {
+    <label class="fld">Partenaire${inp("t-p", "ex. Lucas Gutierrez", t.partner || "").replace("<input", '<input list="plist"')}</label>${partnerList()}`, async () => {
     const c = S.comp; const d = $("#t-d").value; if (!d) { toast("Choisis une date"); return false; }
     const item = { id: t.id || "u" + Date.now(), date: d, cat: $("#t-c").value, name: $("#t-n").value.trim(), partner: $("#t-p").value.trim() };
     c.upcoming = (c.upcoming || []).filter(x => x.id !== item.id); c.upcoming.push(item); await saveComp(); toast("Tournoi ajouté");
@@ -1024,7 +1060,7 @@ function resultSheet(r = {}) {
     <label class="fld" style="width:90px">Paires${inp("r-n", "16", r.pairs || "", "numeric")}</label><label class="fld" style="width:90px">Place${inp("r-pl", "8", r.place || "", "numeric")}</label></div>
     <label class="fld">Points <span class="small muted" id="r-hint"></span>${inp("r-pts", "calculés tout seuls", r.pts ?? "", "numeric")}</label>
     <label class="fld">Nom / club${inp("r-nm", "ex. P25 Corbas", r.name || "")}</label>
-    <label class="fld">Partenaire${inp("r-pa", "", r.partner || "")}</label>
+    <label class="fld">Partenaire${inp("r-pa", "", r.partner || "").replace("<input", '<input list="plist"')}</label>${partnerList()}
     <label class="fld">Matchs (V/D)${inp("r-m", "ex. D V D D", r.matches || "")}</label>`, async () => {
     const c = S.comp; const pts = num($("#r-pts").value) ?? baremePts($("#r-c").value, +$("#r-pl").value, +$("#r-n").value);
     if (!$("#r-d").value || pts == null) { toast("Il manque la date ou les points"); return false; }
