@@ -820,7 +820,7 @@ function padelOn(iso) {
     if (p.weekly) { if (p.wd === wd && iso >= p.date && !(p.skip || []).includes(iso)) out.push({ ...p, occ: iso }); }
     else if (p.date === iso) out.push({ ...p, occ: iso });
   }
-  for (const t of [...(S.comp?.upcoming || []), ...(S.comp?.results || [])]) if (t.date === iso) out.push({ id: "t-" + t.id, type: "tournoi", dur: 300, label: t.cat + (t.name ? " · " + t.name : ""), fromComp: true, occ: iso });
+  for (const t of [...(S.comp?.upcoming || []), ...(S.comp?.results || [])]) if (t.date === iso) out.push({ id: "t-" + t.id, type: "tournoi", time: t.time || "", dur: t.time && t.endTime ? ((hmMin(t.endTime) - hmMin(t.time) + 1440) % 1440 || 300) : 300, label: t.cat + (t.name ? " · " + t.name : ""), fromComp: true, occ: iso });
   return out.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
 }
 const padelMin = iso => padelOn(iso).reduce((s, p) => s + LOAD(p), 0); // minutes « pondérées » par l'intensité
@@ -2061,7 +2061,7 @@ function renderComp() {
     <div class="row between" style="margin-top:6px"><h2>Calendrier</h2><button class="btn sm" id="c-addup" type="button">+ Tournoi</button></div>
     ${up.length ? up.map(t => { const d = Math.round((parseISO(t.date) - today) / DAY); return `<div class="sess" style="grid-template-columns:56px 1fr auto">
       <div class="letter" style="font-size:15px;line-height:1;text-align:center">${parseISO(t.date).getDate()}<br><span style="font-size:12px">${parseISO(t.date).toLocaleDateString("fr-FR", { month: "short" })}</span></div>
-      <div><h3>${esc(t.cat)} · ${esc(t.name || "Tournoi")}</h3><div class="small muted">${t.partner ? "avec " + esc(t.partner) + " · " : ""}${d > 0 ? "dans " + d + " j" : d === 0 ? "aujourd'hui" : "passé"}</div></div>
+      <div><h3>${esc(t.cat)} · ${esc(t.name || "Tournoi")}</h3><div class="small muted">${t.time ? t.time.replace(":", "h") + (t.endTime ? "–" + t.endTime.replace(":", "h") : "") + " · " : ""}${t.partner ? "avec " + esc(t.partner) + " · " : ""}${d > 0 ? "dans " + d + " j" : d === 0 ? "aujourd'hui" : "passé"}</div></div>
       <button class="btn sm ${d <= 0 ? "primary" : "ghost"}" data-res="${t.id}" type="button">${d <= 0 ? "Résultat" : "…"}</button></div>`; }).join("") : `<p class="muted small" style="margin:0">Aucun tournoi prévu. La semaine d'un tournoi, la salle passe toute seule en mode tournoi.</p>`}
 
     <div class="row between" style="margin-top:6px"><h2>Résultats</h2><span class="small muted">${res.length} tournois${wins + losses ? ` · ${wins} V – ${losses} D` : ""}</span></div>
@@ -2144,13 +2144,18 @@ function rankSheet() {
 function tourSheet(t = {}) {
   openSheet(`<h2>${t.id ? "Modifier le tournoi" : "Nouveau tournoi"}</h2>
     <label class="fld">Date<input id="t-d" type="date" value="${t.date || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    <div class="row"><label class="fld" style="flex:1">Début<input id="t-h" type="time" value="${t.time || ""}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    <label class="fld" style="flex:1">Fin<input id="t-e" type="time" value="${t.endTime || ""}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label></div>
+    <p class="small muted" style="margin:-4px 0 0">Horaires facultatifs : sans début, il est noté « toute la journée ».</p>
     <label class="fld">Catégorie<select id="t-c">${CATS.map(k => `<option ${k === (t.cat || "P25") ? "selected" : ""}>${k}</option>`).join("")}</select></label>
     <label class="fld">Nom / club${inp("t-n", "ex. P25 Corbas", t.name || "")}</label>
     <label class="fld">Partenaire${inp("t-p", "ex. Lucas Gutierrez", t.partner || "").replace("<input", '<input list="plist"')}</label>${partnerList()}
     <p class="small muted" style="margin:0">Il s'ajoute aussi à l'agenda des mimichats.</p>
     ${t.id ? `<button class="btn sm danger" id="t-del" type="button" style="align-self:flex-start">Supprimer ce tournoi</button>` : ""}`, async () => {
     const c = S.comp; const d = $("#t-d").value; if (!d) { toast("Choisis une date"); return false; }
-    const item = { ...t, id: t.id || "u" + Date.now(), date: d, cat: $("#t-c").value, name: $("#t-n").value.trim(), partner: $("#t-p").value.trim() };
+    const tm = $("#t-h").value, te = tm ? $("#t-e").value : "";
+    if (!tm && $("#t-e").value) { toast("Mets aussi l'heure de début"); return false; }
+    const item = { ...t, id: t.id || "u" + Date.now(), date: d, time: tm, endTime: te, cat: $("#t-c").value, name: $("#t-n").value.trim(), partner: $("#t-p").value.trim() };
     c.upcoming = (c.upcoming || []).filter(x => x.id !== item.id); c.upcoming.push(item); await saveComp(); toast(t.id ? "Tournoi modifié" : "Tournoi ajouté");
     pushTournament(item);
   });
@@ -2164,7 +2169,7 @@ const tourTitle = t => "🎾 " + t.cat + (t.name && t.name !== t.cat ? " · " + 
 function pushTournament(t, extra = {}) {
   if (Store.mode !== "db") return Promise.resolve();
   const id = t.evId || "sp-" + t.id;
-  return evCol().doc(id).set({ title: tourTitle(t), date: t.date, endDate: "", time: t.time || "", endTime: "", allDay: !t.time, who: "thib", recur: "none", remind: "none",
+  return evCol().doc(id).set({ title: tourTitle(t), date: t.date, endDate: "", time: t.time || "", endTime: t.time ? t.endTime || "" : "", allDay: !t.time, who: "thib", recur: "none", remind: "none",
     padel: t.cat, padelName: t.name || "", partner: t.partner || "", padelId: t.id, by: "thib", at: Date.now(), ...extra }, { merge: true })
     .then(() => { if (!t.evId) { t.evId = id; saveComp(); } }) // lien noté seulement une fois l'événement créé
     .catch(() => toast("Agenda des mimichats non mis à jour (réseau ?)"));
@@ -2184,8 +2189,8 @@ async function pullTournaments() {
       const name = e.padelName != null && e.title === tourTitle({ cat: e.padel, name: e.padelName }) ? e.padelName
         : String(e.title || "").replace(/^🎾\s*/, "").replace(new RegExp("^" + e.padel + "\\s*·?\\s*"), "").trim();
       const u = c.upcoming.find(x => x.evId === id);
-      if (!u) { if (!known.has(id) && e.date >= plusDays(today, -3)) { c.upcoming.push({ id: "m" + Date.now() + Math.random().toString(36).slice(2, 5), evId: id, date: e.date, time: e.time || "", cat: e.padel, name, partner: e.partner || "" }); changed = true; } continue; }
-      const upd = { date: e.date, time: e.time || "", cat: e.padel, name, partner: e.partner ?? u.partner };
+      if (!u) { if (!known.has(id) && e.date >= plusDays(today, -3)) { c.upcoming.push({ id: "m" + Date.now() + Math.random().toString(36).slice(2, 5), evId: id, date: e.date, time: e.time || "", endTime: e.endTime || "", cat: e.padel, name, partner: e.partner || "" }); changed = true; } continue; }
+      const upd = { date: e.date, time: e.time || "", endTime: e.endTime || "", cat: e.padel, name, partner: e.partner ?? u.partner };
       if (Object.keys(upd).some(k => (u[k] || "") !== (upd[k] || ""))) { Object.assign(u, upd); changed = true; }
     }
     // Supprimés dans les mimichats (ou qui ne sont plus des tournois)
