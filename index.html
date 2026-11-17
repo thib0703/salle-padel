@@ -384,62 +384,95 @@ const PROGRAM = {
 };
 PROGRAM.M = {
   title: "Séance M", sub: "Motricité à la maison", dur: "20-25 min", home: true,
-  warning: "Balle de tennis + élastiques, 2 m × 2 m et un bout de mur suffisent. Faisable même un jour de padel, sauf jour de tournoi. Idéal : 2 à 3 fois par semaine.",
+  warning: "Il te faut : une balle de tennis, un élastique léger et un moyen, un bout de mur libre et environ 2 m × 2 m. Faisable même un jour de padel, sauf jour de tournoi. Idéal : 2 à 3 fois par semaine.",
+  intro: [
+    "Fais les exercices dans l'ordre, du haut vers le bas. Ouvre « Comment faire » sur chaque carte : tout est expliqué étape par étape.",
+    "« 3 × 20 s » veut dire 3 séries de 20 secondes. « 3 × 10 / côté » : 3 séries de 10, de chaque côté (ou chaque jambe, chaque bras).",
+    "Coche une case quand une série est finie : le chrono de repos se lance tout seul, avec un bip à la fin.",
+    "Désactive le mode silencieux de l'iPhone (bouton sur le côté) pour entendre les bips."
+  ],
   warmup: [
-    ["Sautillements sur place", "1 min", "Petits rebonds sur l'avant des pieds, de plus en plus vifs."],
-    ["Hanches en 90/90", "5 / côté", "Assis, jambes pliées à 90°, bascule les genoux d'un côté à l'autre sans les mains."],
-    ["Genou au mur", "10 / côté", "Pied à 10 cm du mur, le genou touche le mur sans décoller le talon."],
-    ["Rotations du haut du dos", "8 / côté", "À quatre pattes, main derrière la tête, ferme puis ouvre le coude vers le plafond."],
-    ["Fentes latérales poids du corps", "8 / côté", "Grand pas de côté, fesses en arrière, l'autre jambe tendue."]
+    ["Sautillements sur place", "1 min", "Debout, pieds écartés de la largeur de tes hanches. Fais de tout petits sauts sur place, sur l'avant des pieds (les talons ne touchent jamais le sol), comme à la corde à sauter. Doucement au début, plus vite sur les 20 dernières secondes."],
+    ["Hanches en 90/90", "10 bascules", "Assis par terre, mains posées au sol derrière toi. Une jambe pliée devant toi, l'autre pliée sur le côté, les deux genoux à angle droit : tes jambes dessinent un Z. Sans bouger les pieds, fais basculer les deux genoux de l'autre côté pour faire le Z inverse. Chaque bascule compte pour 1."],
+    ["Genou au mur (chevilles)", "10 / côté", "Face à un mur, pose un pied à environ 10 cm du mur (la largeur de ta main). Plie le genou pour venir toucher le mur avec le genou, sans que le talon décolle du sol, puis reviens. Si c'est trop facile, recule le pied d'un ou deux centimètres."],
+    ["Livre ouvert (haut du dos)", "8 / côté", "Allongé sur le côté, genoux pliés devant toi, bras tendus devant la poitrine, une main sur l'autre. Ouvre le bras du dessus vers l'arrière en suivant ta main des yeux, comme un livre qui s'ouvre, jusqu'à toucher le sol derrière toi si tu peux. Les genoux restent collés. Reviens, 8 fois, puis tourne-toi de l'autre côté."],
+    ["Fentes latérales", "8 / côté", "Debout, pieds joints. Fais un grand pas sur le côté et descends sur cette jambe en poussant les fesses en arrière, comme pour t'asseoir. L'autre jambe reste tendue, les deux pieds bien à plat. Pousse pour revenir au centre, puis change de côté."]
   ],
   groups: [
     { name: "Bloc 1 · Appuis et réaction", items: [
       { id: "m-ligne", name: "Pieds rapides sur une ligne", sets: same(3), reps: same("20 s"), rest: 30, kind: "check",
-        why: "Fréquence d'appuis",
-        how: "Prends un joint de carrelage ou une ligne de parquet. 20 s à fond, une variante par série : 1) sauts latéraux pieds joints, 2) avant-arrière, 3) un pied de chaque côté en ciseaux.",
-        cues: ["Sur l'avant du pied, le plus de contacts possible.", "Petits sauts, regard devant toi."] },
-      { id: "m-chasse", name: "Pas chassés élastique", unit: "/ côté", sets: same(3), reps: same("10 pas"), rest: 30, kind: "check",
-        why: "Fessier moyen, déplacement latéral",
-        how: "Élastique autour des chevilles (ou juste au-dessus des genoux). Position de défense, genoux fléchis : 3-4 pas chassés d'un côté, autant pour revenir, jusqu'à 10 pas par côté. Pas de place du tout ? Fais-les sur place : un pied s'écarte contre l'élastique, l'autre suit.",
-        cues: ["Les pieds ne se touchent jamais.", "Hauteur constante, pas de balancier du buste."],
-        bloc: ["Élastique léger.", "Élastique moyen.", "Élastique fort, plus bas sur les jambes."],
-        video: yt("lateral band walk") },
+        why: "Des pieds plus rapides pour te replacer",
+        how: "Des petits sauts très rapides par-dessus une ligne au sol, 20 secondes à fond.",
+        setup: "Trouve une ligne au sol : un joint de carrelage, le bord d'une latte de parquet, ou pose une chaussette par terre. Mets-toi juste à côté.",
+        steps: ["Série 1 : pieds joints, saute à gauche de la ligne puis à droite, et ainsi de suite, le plus vite possible.", "Série 2 : pieds joints, saute devant la ligne puis derrière.", "Série 3 : en ciseaux. Un pied devant la ligne, l'autre derrière, et tu inverses les pieds en sautant, le plus vite possible.", "Coche la case après chaque série et récupère pendant le chrono."],
+        feel: "Les mollets qui chauffent et le souffle court à la fin des 20 secondes.",
+        cues: ["Reste sur l'avant des pieds, talons décollés.", "Saute à peine : 2-3 cm du sol suffisent, c'est la vitesse qui compte.", "Bras souples, regard devant toi, pas sur tes pieds."],
+        video: yt("exercice pieds rapides ligne au sol") },
+      { id: "m-chasse", name: "Pas chassés avec élastique", unit: "/ côté", sets: same(3), reps: same("10 pas"), rest: 30, kind: "check",
+        why: "Muscle le côté des fesses, qui sert à freiner et repartir sur les côtés",
+        how: "Des pas sur le côté en position de défense, avec un élastique qui résiste.",
+        setup: "Passe l'élastique moyen autour des deux chevilles (ou juste au-dessus des genoux si c'est trop dur). Écarte les pieds de la largeur des épaules : l'élastique doit déjà être un peu tendu.",
+        steps: ["Mets-toi en position de défense : genoux pliés, fesses en arrière comme si tu allais t'asseoir, buste légèrement penché, mains devant toi comme avec une raquette.", "Fais un pas sur le côté avec le pied droit, puis ramène le pied gauche, sans que les pieds se touchent : c'est un pas chassé.", "Fais 10 pas vers la droite. Pas assez de place ? Fais 3-4 pas, puis reviens en sens inverse, jusqu'à 10 pas.", "Fais ensuite 10 pas vers la gauche. Ça fait 1 série."],
+        feel: "Une brûlure sur le côté et le haut des fesses. Si tu le sens surtout dans les cuisses, pousse plus les fesses en arrière.",
+        cues: ["L'élastique reste tendu tout le temps : les pieds ne se rapprochent jamais complètement.", "Tu restes à la même hauteur, sans te relever entre deux pas.", "Les genoux poussent vers l'extérieur, ils ne rentrent pas."],
+        bloc: ["Élastique léger.", "Élastique moyen.", "Élastique fort, ou le moyen placé plus bas sur les jambes."],
+        video: yt("pas chassés élastique chevilles") },
       { id: "m-react", name: "Réaction : split-step + déplacement", sets: [4, 5, 6], reps: same("20 s"), rest: 40, kind: "react",
-        why: "Lire, réagir, partir vite",
-        how: "Pose le téléphone à 1,5-2 m devant toi (sur une chaise ou contre un mur). Petits rebonds sur place. À chaque bip, une flèche apparaît : split-step, puis UN grand pas explosif dans cette direction (fente avant, pas croisé de côté, pas en arrière) en faisant le geste de frappe, et retour au centre. 2 m × 2 m suffisent.",
-        cues: ["Toujours un split-step avant de partir.", "Buste bas, premier pas explosif.", "Flèche vers le bas = recule comme sur un lob."],
-        bloc: ["4 directions, signal toutes les 2 s environ.", "8 directions (diagonales en plus).", "8 directions, signaux plus rapprochés."],
-        video: yt("padel split step footwork") }
+        why: "Lire, réagir et partir vite, comme sur une balle",
+        how: "Le téléphone affiche une flèche au hasard avec un bip : tu réagis le plus vite possible dans cette direction.",
+        setup: "Pose le téléphone debout sur une chaise ou contre un mur, à 1,5-2 m devant toi, écran vers toi. Désactive le mode silencieux. Appuie sur « Lancer les signaux » : tu as 5 secondes pour te placer, puis l'appli enchaîne seule les séries et les récupérations.",
+        steps: ["Le split-step : c'est le petit saut que tu fais au moment où l'adversaire frappe. Tu décolles à peine du sol et tu retombes sur l'avant des deux pieds, écartés, genoux pliés, prêt à partir de n'importe quel côté.", "Pendant la série, fais de petits rebonds sur place. Au bip, fais ton split-step et regarde la flèche.", "↑ (volée) : grande fente vers l'avant et geste de volée.", "↓ (lob) : un pas en arrière en te mettant de profil, raquette haute, comme pour reculer sur un lob.", "← ou → : un grand pas sur le côté (ou un pas croisé), avec le geste de coup droit ou de revers.", "Flèches en diagonale (à partir du bloc 2) : même chose, en avant ou en arrière dans le coin indiqué.", "Reviens tout de suite au centre et reprends tes petits rebonds en attendant le bip suivant."],
+        feel: "Un peu d'essoufflement à la fin des 20 secondes. Ce qui compte, c'est la vitesse du premier pas.",
+        cues: ["Toujours un split-step avant de partir.", "Reste bas, avec les genoux pliés, du début à la fin.", "Un seul grand pas explosif suffit : 2 m × 2 m d'espace, c'est assez."],
+        bloc: ["4 directions, un signal toutes les 2 secondes environ.", "8 directions (avec les diagonales).", "8 directions, signaux plus rapprochés."],
+        video: yt("padel split step explication") }
     ] },
     { name: "Bloc 2 · Équilibre et chevilles", items: [
-      { id: "m-equi", name: "Équilibre une jambe + balle", unit: "/ jambe", sets: same(3), reps: same("30 s"), rest: 20, kind: "check",
-        why: "Chevilles, prévention des entorses",
-        how: "Sur une jambe, genou légèrement fléchi, à 1-2 m d'un mur. Lance la balle de tennis contre le mur et rattrape-la sans poser l'autre pied.",
-        cues: ["Pied ancré, orteils détendus."],
-        bloc: ["Pied nu au sol, balle à deux mains.", "Une seule main, lancers plus vifs.", "Sur un coussin plié, ou yeux fermés sans balle."] },
-      { id: "m-recep", name: "Sauts avec réception une jambe", unit: "/ jambe", sets: same(3), reps: same("5"), rest: 45, kind: "check",
-        why: "Freiner et repartir",
-        how: "Petit saut (30-50 cm suffisent) en avant, de côté ou en arrière, réception sur une jambe. Tiens 2 s immobile, genou dans l'axe du pied, puis reviens au point de départ.",
-        cues: ["Réception silencieuse.", "Le genou ne rentre pas vers l'intérieur."],
-        bloc: ["Petits sauts.", "Sauts un peu plus hauts, sur place ou presque.", "Enchaîne : réception puis rebond direct dans une autre direction."],
-        video: yt("single leg hop and stick") }
+      { id: "m-equi", name: "Équilibre sur une jambe + balle", unit: "/ jambe", sets: same(3), reps: same("30 s"), rest: 20, kind: "check",
+        why: "Des chevilles solides, moins d'entorses",
+        how: "Tenir en équilibre sur une jambe pendant que tu joues avec la balle contre le mur.",
+        setup: "Pieds nus ou en chaussettes, face à un mur, à 1 ou 2 m.",
+        steps: ["Lève un pied et tiens-toi sur l'autre jambe, genou très légèrement plié.", "Lance la balle de tennis contre le mur et rattrape-la, sans poser l'autre pied, pendant 30 secondes.", "Change de jambe : jambe droite puis jambe gauche, ça fait 1 série.", "Si tu poses le pied, ce n'est pas grave : repars aussitôt."],
+        feel: "La cheville et le pied qui travaillent sans arrêt pour te garder droit.",
+        cues: ["Le bassin reste horizontal, sans tomber d'un côté.", "Orteils détendus, sans les crisper au sol."],
+        bloc: ["Lance et rattrape à deux mains.", "Une seule main, lancers plus vifs.", "Sans balle, les yeux fermés, ou debout sur un coussin plié."],
+        video: yt("équilibre unipodal balle mur proprioception") },
+      { id: "m-recep", name: "Sauts avec réception sur une jambe", unit: "/ jambe", sets: same(3), reps: same("5"), rest: 45, kind: "check",
+        why: "Apprendre à freiner net pour repartir, comme sur un changement de direction",
+        how: "Un petit saut, puis tu te réceptionnes sur une seule jambe et tu restes immobile 2 secondes.",
+        setup: "Il te faut 1 m de place autour de toi. Pieds nus ou en baskets, sur un sol qui ne glisse pas.",
+        steps: ["Debout sur la jambe droite.", "Fais un petit saut de 30 à 50 cm (en avant, sur le côté ou en arrière) et retombe sur la même jambe.", "Bloque-toi 2 secondes, immobile : genou plié, aligné avec le pied.", "Reviens au point de départ en marchant. Fais 5 sauts en variant les directions, puis passe à la jambe gauche."],
+        feel: "Les fesses et la cuisse qui freinent à la réception. Une réception silencieuse veut dire qu'elle est bien amortie.",
+        cues: ["Le genou ne doit jamais rentrer vers l'intérieur.", "Si tu vacilles, fais des sauts plus petits."],
+        bloc: ["Petits sauts.", "Sauts un peu plus longs.", "Réception puis rebond direct dans une autre direction, sans pause."],
+        video: yt("saut unipodal réception stabilisation") }
     ] },
     { name: "Bloc 3 · Coordination et prévention", items: [
       { id: "m-mur", name: "Balle contre le mur", sets: same(3), reps: same("45 s"), rest: 30, kind: "check",
-        why: "Œil-main, réflexes",
-        how: "Face au mur à 1,5-2 m. Lance et rattrape la balle : main droite, main gauche, puis en alternant. Rapproche-toi pour accélérer le rythme.",
-        cues: ["Rattrape devant toi, bras souples.", "Reste sur l'avant des pieds."],
-        bloc: ["Une main, puis l'autre.", "Alterné, plus près du mur.", "Lance d'une main, rattrape de l'autre, avec un petit pas chassé entre chaque."] },
-      { id: "m-rot", name: "Rotation élastique", unit: "/ côté", sets: same(3), reps: same("10"), rest: 30, kind: "check",
-        why: "Rotation du tronc des frappes",
-        how: "Élastique accroché à une poignée de porte fermée, à hauteur de poitrine. De profil, tourne les hanches puis les épaules et tire l'élastique de l'autre côté, comme un coup droit. Retour lent.",
-        cues: ["La force part des hanches.", "Aller rapide, retour en 2 s."],
-        video: yt("band rotation core") },
-      { id: "m-epaule", name: "Rotations externes élastique", unit: "/ bras", sets: same(2), reps: same("15"), rest: 20, kind: "check",
-        why: "Prévention épaule",
-        how: "Élastique léger, coude collé au corps et plié à 90°. Ouvre l'avant-bras vers l'extérieur, reviens lentement.",
-        cues: ["Très léger, lent et contrôlé."],
-        video: yt("band external rotation") }
+        why: "La coordination entre tes yeux et tes mains, et tes réflexes",
+        how: "Tu lances et tu rattrapes la balle de tennis contre le mur, de plus en plus vite.",
+        setup: "Face au mur, à 1,5 ou 2 m, pieds écartés, genoux un peu pliés.",
+        steps: ["Lance la balle contre le mur et rattrape-la de la même main pendant 15 secondes avec la main droite, puis 15 secondes avec la gauche.", "Termine par 15 secondes en lançant d'une main et en rattrapant de l'autre.", "Pour accélérer, rapproche-toi du mur."],
+        feel: "Pas de fatigue particulière : ce sont la vivacité et la précision qui travaillent.",
+        cues: ["Rattrape la balle devant toi, bras souples.", "Reste sur l'avant des pieds, comme en match."],
+        bloc: ["Une main, puis l'autre.", "Mains alternées, plus près du mur.", "Lance d'une main, rattrape de l'autre, avec un petit pas chassé entre chaque lancer."],
+        video: yt("exercice balle tennis contre mur réflexes") },
+      { id: "m-rot", name: "Rotation du tronc à l'élastique", unit: "/ côté", sets: same(3), reps: same("10"), rest: 30, kind: "check",
+        why: "Plus de puissance dans les frappes, qui partent des hanches",
+        how: "Tu tires l'élastique en tournant le corps, comme pour un coup droit.",
+        setup: "Fais un nœud au bout de l'élastique moyen, passe le nœud de l'autre côté d'une porte, côté charnières, à hauteur de poitrine, et ferme la porte : l'élastique est coincé. Mets-toi de profil à la porte, à un pas.",
+        steps: ["Tiens l'autre bout de l'élastique à deux mains, bras presque tendus devant ta poitrine, pieds écartés, genoux un peu pliés. L'élastique doit être tendu.", "Tourne d'abord les hanches à l'opposé de la porte, en faisant pivoter le pied arrière, puis les épaules. Les mains suivent et l'élastique passe devant toi.", "Reviens lentement, en 2 secondes, à la position de départ.", "10 fois, puis retourne-toi pour faire l'autre côté."],
+        feel: "Les côtés du ventre (les obliques) et le gainage.",
+        cues: ["La force part des hanches, pas des bras : les bras restent presque tendus.", "Aller rapide, retour lent."],
+        video: yt("rotation tronc élastique porte") },
+      { id: "m-epaule", name: "Rotations externes à l'élastique", sets: same(2), reps: same("15"), rest: 20, kind: "check",
+        why: "Protège tes épaules, très sollicitées au padel",
+        how: "Tu écartes l'élastique en gardant les coudes collés au corps.",
+        setup: "Prends l'élastique léger à deux mains, paumes vers le haut, mains écartées de la largeur de tes épaules.",
+        steps: ["Colle les deux coudes contre tes flancs, pliés à angle droit, avant-bras devant toi.", "Sans décoller les coudes, écarte les mains vers l'extérieur en tirant l'élastique, le plus loin possible.", "Tiens 1 seconde, puis reviens lentement."],
+        feel: "L'arrière des épaules et le haut du dos. C'est léger, ça ne doit pas faire mal.",
+        cues: ["Les coudes ne quittent jamais tes flancs.", "Choisis un élastique très léger, et fais le mouvement lentement."],
+        video: yt("rotation externe épaule élastique deux mains") }
     ] }
   ]
 };
@@ -900,6 +933,7 @@ function renderSession(key) {
     ${wi.lowForm ? `<div class="notice small">Forme basse : ${wi.form === 1 ? "deux séries de moins" : "une série de moins"} par exercice, mêmes charges ou un cran en dessous. Si ça ne passe vraiment pas, une séance M ou du repos valent mieux.</div>` : ""}
     ${wi.fatigue && !wi.lowForm && !wi.deload && !wi.tournament ? `<div class="notice info small">Padel aujourd'hui ou grosse séance hier : une série de moins par exercice.</div>` : ""}
     ${key === "C" && wi.padelWeek >= 180 ? `<div class="notice info small">Tu as beaucoup de padel cette semaine : le cardio de fin est divisé par deux.</div>` : ""}
+    ${p.intro ? `<details class="how" style="border:1px solid var(--line);border-radius:var(--r)" ${S.logs.some(l => l.session === key) ? "" : "open"}><summary>Comment se passe la séance</summary><div class="how-body"><ul style="margin:0">${p.intro.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div></details>` : ""}
     ${p.warning ? `<div class="notice ${key === "A" ? "" : "info"} small">${p.warning}</div>` : ""}
     <details class="warm" ${warmDone < WU.length ? "open" : ""}>
       <summary><h3>Échauffement</h3><span class="chip ${warmDone === WU.length ? "good" : ""}" id="wcount">${warmDone}/${WU.length}</span></summary>
@@ -965,7 +999,7 @@ function exCard(ex, n, wi, cur) {
     <div class="ex-head"><span class="ex-num">${n}</span><div><h3>${esc(ex.name)}</h3>${ex.why ? `<div class="small muted">${esc(ex.why)}</div>` : ""}</div>
       <div class="presc">${pr.sets} × ${esc(pr.reps)}<small>${ex.unit ? esc(ex.unit) + " · " : ""}${ex.rest ? "repos " + restLabel(ex.rest) : ""}</small></div></div>
     ${lastTxt || hint || ex.bloc ? `<div class="ex-meta">${lastTxt ? `<div class="last">${lastTxt}</div>` : ""}${hint ? `<div class="hint">${hint}</div>` : ""}${ex.bloc && !lastTxt ? `<div class="last">${esc(ex.bloc[wi.bloc])}</div>` : ""}</div>` : ""}
-    <details class="how"><summary>Comment faire</summary><div class="how-body"><p style="margin:0">${esc(ex.how)}</p>${ex.cues?.length ? `<ul>${ex.cues.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}${blocNote}${ex.video ? `<a href="${ex.video}" target="_blank" rel="noopener">Voir une vidéo de démo ›</a>` : ""}</div></details>
+    <details class="how"><summary>Comment faire</summary><div class="how-body"><p style="margin:0">${esc(ex.how)}</p>${ex.setup ? `<p style="margin:0"><b>Mise en place :</b> ${esc(ex.setup)}</p>` : ""}${ex.steps?.length ? `<ol style="margin:0;padding-left:20px;display:grid;gap:6px">${ex.steps.map(c => `<li>${esc(c)}</li>`).join("")}</ol>` : ""}${ex.feel ? `<p style="margin:0"><b>Tu dois sentir :</b> ${esc(ex.feel)}</p>` : ""}${ex.cues?.length ? `${ex.steps ? "<b>Points clés :</b>" : ""}<ul>${ex.cues.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}${blocNote}${ex.video ? `<a href="${ex.video}" target="_blank" rel="noopener">Voir une vidéo de démo ›</a>` : ""}</div></details>
     <div class="sets">${setsHtml}</div>
   </article>`;
 }
