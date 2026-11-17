@@ -1,0 +1,33 @@
+# Salle Padel : envoie les fonctions Firebase (rappels + pas) depuis Windows PowerShell.
+# Lancement : irm https://thib0703.github.io/salle-padel/p.txt | iex
+$ErrorActionPreference = "Stop"
+function Step($t) { Write-Host ""; Write-Host $t -ForegroundColor Yellow }
+function Check($what) { if ($LASTEXITCODE -ne 0) { Write-Host "Echec : $what. Envoie une capture de cette fenetre a Claude." -ForegroundColor Red; throw "stop" } }
+
+Step "1/4 Verification de Node.js..."
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+  Write-Host "Node.js absent : installation (accepte si Windows le demande)..."
+  winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+  $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Write-Host "Node.js installe : ferme PowerShell, rouvre-le et relance la meme commande." -ForegroundColor Red; return }
+}
+node --version
+
+Step "2/4 Telechargement du code..."
+$d = Join-Path $env:TEMP "salle-padel-deploy"
+if (Test-Path $d) { Remove-Item $d -Recurse -Force }
+New-Item -ItemType Directory $d | Out-Null
+Invoke-WebRequest "https://codeload.github.com/thib0703/les-mimichats/zip/refs/heads/main" -OutFile "$d\code.zip" -UseBasicParsing
+Expand-Archive "$d\code.zip" $d
+Set-Location "$d\les-mimichats-main\serveur\functions"
+npm.cmd install --no-audit --no-fund --loglevel=error; Check "installation des modules"
+Set-Location ..
+
+Step "3/4 Connexion a Firebase (une page peut s'ouvrir dans le navigateur : autorise avec ton compte Google)..."
+npx.cmd -y firebase-tools login; Check "connexion a Firebase"
+
+Step "4/4 Envoi des fonctions (2 a 4 min)..."
+npx.cmd -y firebase-tools deploy --only "functions:rappelsSallePadel,functions:pasSallePadel" --project les-mimichats --non-interactive --force; Check "envoi des fonctions"
+
+Step "C'est bon ! Retourne dans Salle Padel > Reglages > Pas & hydratation."
+Set-Location $env:USERPROFILE
