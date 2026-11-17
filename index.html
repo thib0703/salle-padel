@@ -179,7 +179,21 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .wchart svg { width: 100%; height: auto; display: block; }
 .modal { position: fixed; inset: 0; background: rgba(5,12,20,.7); display: none; align-items: flex-end; justify-content: center; z-index: 30; padding: 16px; }
 .modal.on { display: flex; }
-.sheet { background: var(--court-2); border: 1px solid var(--line); border-radius: 18px; padding: 18px; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 12px; margin-bottom: env(safe-area-inset-bottom); }
+.sheet { background: var(--court-2); border: 1px solid var(--line); border-radius: 18px; padding: 18px; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 12px; margin-bottom: env(safe-area-inset-bottom); max-height: calc(100dvh - 40px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--court-2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.seg a { text-align: center; padding: 8px 4px; border-radius: 9px; text-decoration: none; color: var(--muted); font-weight: 700; font-size: 14px; }
+.seg a.on { background: var(--court-3); color: var(--chalk); }
+.cgrid { display: flex; flex-wrap: wrap; gap: 6px; }
+.cgrid .chip { border: 0; padding: 7px 12px; font: inherit; font-size: 13.5px; font-weight: 600; }
+.jcard { background: var(--court-2); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 6px; }
+.res { font-family: var(--display); font-weight: 700; font-size: 18px; width: 30px; height: 30px; border-radius: 8px; display: inline-grid; place-items: center; }
+.res.V { background: rgba(79,211,154,.18); color: var(--good); } .res.D { background: rgba(255,159,90,.18); color: var(--warn); }
+.hbar { display: grid; grid-template-columns: 110px 1fr 24px; gap: 8px; align-items: center; font-size: 13.5px; }
+.hbar i { display: block; height: 10px; border-radius: 5px; }
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kpi { background: var(--court-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.kpi b { display: block; font-family: var(--display); font-size: 28px; line-height: 1.1; }
+.kpi span { color: var(--muted); font-size: 13px; }
 .toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 12px); transform: translateX(-50%); background: var(--good); color: #062A1B; font-weight: 700; padding: 10px 16px; border-radius: 999px; z-index: 40; display: none; }
 .toast.on { display: block; }
 .sync { font-size: 12.5px; color: var(--muted); text-align: center; }
@@ -232,6 +246,7 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <script>
 "use strict";
 const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
@@ -490,6 +505,22 @@ const PREMATCH = [
   ["Coups à vide", 60, "Coup droit, revers, volées, bandeja, smash : gestes amples et relâchés, de plus en plus vite."]
 ];
 
+// Récup guidée après un match, environ 8 min
+const POSTMATCH = [
+  ["Marche tranquille", 60, "Marche en respirant profondément par le nez, pour faire redescendre le cœur."],
+  ["Mollets contre un mur", 60, "Mains au mur, une jambe tendue loin derrière, talon au sol, genou tendu. 30 s par jambe : tu sens l'étirement dans le mollet."],
+  ["Avant des cuisses", 60, "Debout (tiens-toi au mur), attrape ta cheville et ramène le talon vers la fesse, genoux serrés, bassin poussé vers l'avant. 30 s par jambe."],
+  ["Arrière des cuisses", 60, "Pose un talon sur un banc ou une marche, jambe tendue. Penche-toi en avant dos droit jusqu'à sentir l'arrière de la cuisse. 30 s par jambe."],
+  ["Fessiers", 60, "Assis, croise une cheville sur le genou opposé et penche-toi en avant dos droit (ou allongé sur le dos, ramène les jambes vers toi). 30 s par côté."],
+  ["Adducteurs (intérieur des cuisses)", 45, "Assis, plantes de pieds collées, genoux ouverts. Pousse doucement les genoux vers le sol avec les coudes, dos droit."],
+  ["Épaule et bras de frappe", 60, "Ramène le bras tendu contre la poitrine avec l'autre main (30 s), puis main dans le dos, coude vers le ciel, l'autre main tire le coude (30 s)."],
+  ["Avant-bras et poignet", 45, "Bras tendu devant, paume vers toi, tire doucement les doigts vers toi avec l'autre main. Puis paume vers l'extérieur. Les deux bras."],
+  ["Respiration", 45, "Allongé ou assis, inspire 4 secondes, souffle 6 secondes. Pense à boire et à manger dans l'heure qui suit."]
+];
+
+// Journal de match
+const COUPS = ["Service", "Retour", "Volée", "Bandeja", "Víbora", "Smash", "Lob", "Sortie de vitre", "Défense fond", "Coup droit", "Revers", "Chiquita", "Placement", "Montée au filet", "Physique", "Mental"];
+
 // Cycles pairs : variantes pour relancer la progression (les charges sont suivies à part)
 const VARIANTS = {
   bulgare: { id: "fentearr", name: "Fente arrière haltères", how: "Debout, un haltère dans chaque main. Grand pas en arrière, descends jusqu'à ce que le genou arrière frôle le sol, puis pousse dans le talon avant pour revenir. Toute une jambe, puis l'autre.", cues: ["Buste légèrement penché.", "Le genou avant ne rentre pas.", "Charge = poids d'un haltère."], video: yt("fente arrière haltères") },
@@ -535,7 +566,8 @@ const FB_CONFIG = {
   messagingSenderId: "564623606130",
   appId: "1:564623606130:web:463f4d42b7e3748f2a5deb"
 };
-const SYNC_KEYS = ["settings", "current", "tests", "padel", "comp", "weights"];
+const VAPID_KEY = "BFakDRVHscjbCVzMvzc2N-p96sATx-RXyKwPLaAnA8uVzqfLS5e4jKVsFJDto_JNuZhhhdU85V2hi0QSICbxJK0";
+const SYNC_KEYS = ["settings", "current", "tests", "padel", "comp", "weights", "journal"];
 // Synchro Firebase (projet « les-mimichats », même compte que l'appli de couple).
 // Firestore refuse les tableaux imbriqués : chaque valeur est stockée en texte JSON.
 // localStorage reste toujours à jour : l'appli marche hors ligne et sans compte.
@@ -665,6 +697,8 @@ function route() {
   window.scrollTo(0, 0);
   if (h.startsWith("seance-")) { setTab(""); return renderSession(h.slice(7).toUpperCase()); }
   if (h === "historique") { setTab(h); return renderHistory(); }
+  if (h === "journal") { setTab("historique"); return renderJournal(); }
+  if (h === "bilan") { setTab("historique"); return renderBilan(); }
   if (h === "tests") { setTab(h); return renderTests(); }
   if (h === "competition") { setTab(h); return renderComp(); }
   if (h === "reglages") { setTab(h); return renderSettings(); }
@@ -874,7 +908,8 @@ function renderHome() {
     </section>
     ${PW.html}
     ${(() => { const today = padelOn(P.todayIso); const m = today.find(p => p.type === "match" || p.type === "tournoi");
-      return `<button class="btn ${m ? "primary" : "ghost"} block" id="prematch" type="button">Échauffement avant-match · 8 min${m ? " (" + (m.type === "tournoi" ? "tournoi" : "match") + " aujourd'hui)" : ""}</button>`; })()}
+      return `<div class="row"><button class="btn ${m ? "primary" : "ghost"}" id="prematch" type="button" style="flex:1">🔥 Avant-match<small style="display:block;font-weight:500;font-size:12px">8 min</small></button><button class="btn ghost" id="postmatch" type="button" style="flex:1">🧘 Récup après<small style="display:block;font-weight:500;font-size:12px">8 min</small></button></div>`; })()}
+    ${(() => { const t = matchToNote(); return t ? `<button class="notice info small" id="note-match" type="button" style="text-align:left;color:inherit;font:inherit;width:100%">📝 Note ton ${t.type === "tournoi" ? "tournoi" : "match"} ${t.date === P.todayIso ? "d'aujourd'hui" : frDate(t.date)} : ce qui a marché, ce qui a coincé (30 s) ›</button>` : ""; })()}
     ${!weekWeight() ? `<a class="notice info small" href="#tests" style="display:block;text-decoration:none;color:inherit">⚖️ Pense à ta pesée de la semaine (prise de masse) ›</a>` : ""}
     <div class="row between"><h2>${headTxt}</h2><span class="small muted">${done.size}/${order.length} faites</span></div>
     ${cards}
@@ -887,8 +922,11 @@ function renderHome() {
     ${recent ? `<div class="stack" style="gap:6px"><h3>Dernières séances</h3>${recent}</div>` : ""}
     <p class="sync">${Store.mode === "db" ? "Synchronisé sur ton compte, sur tous tes appareils." : "Sauvegarde sur cet appareil uniquement."}</p>
   </div>`;
+  syncReminders();
   $("#pad-add").onclick = () => padelSheet();
-  $("#prematch").onclick = () => startGuided(PREMATCH);
+  $("#prematch").onclick = () => startGuided(PREMATCH, "Échauffé, bon match !");
+  $("#postmatch").onclick = () => startGuided(POSTMATCH, "Récup terminée. Pense à noter ton match !");
+  const nm = $("#note-match"); if (nm) nm.onclick = () => { const t = matchToNote(); journalSheet({ date: t.date, type: t.type }); };
   const nc = $("#next-cycle"); if (nc) nc.onclick = () => newCycle();
   app.querySelectorAll("[data-pad]").forEach(b => b.onclick = () => padelSheet(S.padel.find(x => x.id === b.dataset.pad), b.dataset.occ));
   $("#tw").onclick = async () => {
@@ -1151,14 +1189,14 @@ function reactTick() {
     beep(0, 700, .25); reactPhase("rest", R.rest);
   } else reactPhase("work", R.work);
 }
-function startGuided(steps) {
+function startGuided(steps, doneMsg = "Terminé !") {
   stopTimer(); stopReact(); unlockAudio();
   Object.assign(R, { guided: steps, gi: -1 });
   $("#react").classList.add("on", "rest");
   try { navigator.wakeLock?.request("screen").then(l => R.lock = l).catch(() => {}); } catch (e) {}
   const total = steps.reduce((a, s) => a + s[1], 0);
   const next = () => {
-    R.gi++; if (R.gi >= steps.length) { beep(0, 660, .5); beep(.3, 880, .5); stopReact(); toast("Échauffé, bon match !"); return; }
+    R.gi++; if (R.gi >= steps.length) { beep(0, 660, .5); beep(.3, 880, .5); stopReact(); toast(doneMsg); return; }
     const [n, sec, d] = steps[R.gi]; R.end = Date.now() + sec * 1000; R.cd = {};
     $("#r-info").textContent = `Étape ${R.gi + 1} / ${steps.length} · ${Math.round(total / 60)} min au total`;
     $("#r-arrow").textContent = R.gi + 1; $("#r-word").innerHTML = `${esc(n)}<div class="small muted" style="font-family:var(--body);font-weight:400;font-size:16px;max-width:420px;margin:10px auto 0">${esc(d)}</div>`;
@@ -1221,7 +1259,7 @@ function renderHistory() {
   }).join("");
   app.innerHTML = `
   <div class="stack">
-    <h1>Historique</h1>
+    <h1>Historique</h1>${histSeg("historique")}
     <div class="stack" style="gap:8px">
       <label class="fld" for="chartsel">Progression de la charge max</label>
       <select id="chartsel">${TRACKED.map(([id, n]) => `<option value="${id}" ${id === chartEx ? "selected" : ""}>${n}</option>`).join("")}</select>
@@ -1272,7 +1310,7 @@ function weightTrend() {
 function weightHtml() {
   const ww = weekWeight(), t = weightTrend();
   const msg = t == null ? "La tendance apparaît après 3 pesées. Pèse-toi le même jour chaque semaine, le matin à jeun."
-    : t < 0.1 ? `<b>${fmt(Math.round(t * 100) / 100)} kg/semaine</b> : tu stagnes. Pour prendre du muscle, ajoute environ 200-300 kcal par jour (une collation de plus), et vise assez de protéines.`
+    : t < 0.1 ? `<b>${fmt(Math.round(t * 100) / 100)} kg/semaine</b> : tu stagnes. Pour prendre du muscle, il faut manger un peu plus : ajoute une collation (fromage blanc, œufs, banane + poignée d'amandes) ou ressers-toi au dîner.`
     : t <= 0.5 ? `<b>+${fmt(Math.round(t * 100) / 100)} kg/semaine</b> : bon rythme de prise de masse, continue comme ça.`
     : `<b>+${fmt(Math.round(t * 100) / 100)} kg/semaine</b> : ça monte vite. Surveille le tour de taille, tu peux réduire un peu les portions.`;
   return `<section class="stack" style="gap:8px">
@@ -1323,6 +1361,217 @@ function renderTests() {
     const { t, c } = inp.dataset; S.tests = S.tests || {}; S.tests[t] = { ...(S.tests[t] || {}), [c]: inp.value.trim() };
     clearTimeout(testT); testT = setTimeout(() => Store.set("tests", S.tests).catch(() => toast("Sauvegarde impossible")), 900);
   });
+}
+
+/* ------------------------------------------------------------------ JOURNAL DE MATCH */
+function histSeg(on) {
+  return `<nav class="seg">${[["historique", "Salle"], ["journal", "Matchs"], ["bilan", "Bilan"]].map(([h, l]) => `<a href="#${h}" class="${h === on ? "on" : ""}">${l}</a>`).join("")}</nav>`;
+}
+function saveJournal() { return Store.set("journal", S.journal).catch(() => toast("Sauvegarde impossible")); }
+// Un match / tournoi joué récemment (aujourd'hui ou les 3 jours d'avant) et pas encore noté
+function matchToNote() {
+  const today = isoDate(new Date());
+  for (let i = 0; i <= 3; i++) {
+    const d = plusDays(today, -i);
+    const ps = padelOn(d).filter(p => p.type === "match" || p.type === "tournoi");
+    if (!ps.length) continue;
+    if (d === today && ps.every(p => p.time && p.time > new Date().toTimeString().slice(0, 5))) continue;
+    if (!(S.journal || []).some(j => j.date === d)) return { date: d, type: ps[0].type };
+  }
+  return null;
+}
+function journalSheet(j = {}) {
+  const partners = (S.comp?.partners || []).map(p => p.name);
+  const good = new Set(j.good || []), bad = new Set(j.bad || []);
+  const chips = (set, cls, k) => COUPS.map(c => `<button type="button" class="chip ${set.has(c) ? cls : ""}" data-k="${k}" data-c="${esc(c)}">${esc(c)}</button>`).join("");
+  openSheet(`<h2>${j.id ? "Modifier le match" : "Noter un match"}</h2>
+    <div class="row"><label class="fld" style="flex:1">Jour<input id="j-d" type="date" value="${j.date || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+      <label class="fld" style="flex:1">Type<select id="j-t">${[["match", "Match"], ["tournoi", "Tournoi"], ["entrainement", "Entraînement"]].map(([k, l]) => `<option value="${k}" ${(j.type || "match") === k ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
+    <div class="fld">Résultat<div class="row" id="j-r">${[["V", "Victoire"], ["D", "Défaite"]].map(([k, l]) => `<button type="button" class="chip ${j.res === k ? (k === "V" ? "good" : "warn") : ""}" data-r="${k}" style="border:0;padding:8px 16px;font:inherit;font-weight:700">${l}</button>`).join("")}</div></div>
+    <label class="fld">Score <span class="small muted" style="font-weight:400">(facultatif)</span><input id="j-s" value="${esc(j.score || "")}" placeholder="6/4 3/6 7/5" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    <label class="fld">Partenaire<input id="j-p" list="jplist" value="${esc(j.partner || "")}" placeholder="Nom" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"><datalist id="jplist">${partners.map(n => `<option value="${esc(n)}">`).join("")}</datalist></label>
+    <div class="fld">Ressenti<div class="forms" id="j-f">${FORMS.map(([n, e, l]) => `<button type="button" class="fbtn ${j.feel === n ? "on" : ""}" data-f="${n}"><span>${e}</span><small>${["Nul", "Bof", "Moyen", "Bien", "Top"][n - 1]}</small></button>`).join("")}</div></div>
+    <div class="fld">✅ Ce qui a bien marché<div class="cgrid" id="j-g">${chips(good, "good", "g")}</div></div>
+    <div class="fld">🔧 À travailler<div class="cgrid" id="j-b">${chips(bad, "warn", "b")}</div></div>
+    <label class="fld">Note <span class="small muted" style="font-weight:400">(facultatif)</span><textarea id="j-n" rows="2" placeholder="Adversaires, ce qui a fait la différence…" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-size:16px;color:var(--chalk)">${esc(j.note || "")}</textarea></label>
+    ${j.id ? `<button class="btn sm danger" id="j-del" type="button">Supprimer ce match</button>` : ""}`, async () => {
+    const res = $("#j-r .chip.good, #j-r .chip.warn")?.dataset.r || null;
+    const item = { id: j.id || "j" + Date.now(), date: $("#j-d").value || isoDate(new Date()), type: $("#j-t").value, res, score: $("#j-s").value.trim(), partner: $("#j-p").value.trim(),
+      feel: +($("#j-f .fbtn.on")?.dataset.f || 0) || null, good: [...good], bad: [...bad], note: $("#j-n").value.trim() };
+    S.journal = (S.journal || []).filter(x => x.id !== item.id); S.journal.push(item); S.journal.sort((a, b) => b.date.localeCompare(a.date));
+    await saveJournal(); toast("Match noté");
+  }, () => { location.hash === "#journal" ? renderJournal() : (location.hash = "#journal"); });
+  $("#j-r").onclick = e => { const b = e.target.closest("[data-r]"); if (!b) return; const on = !b.classList.contains("good") && !b.classList.contains("warn");
+    $("#j-r").querySelectorAll(".chip").forEach(c => c.classList.remove("good", "warn")); if (on) b.classList.add(b.dataset.r === "V" ? "good" : "warn"); };
+  $("#j-f").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return; const on = !b.classList.contains("on"); $("#j-f").querySelectorAll(".fbtn").forEach(c => c.classList.remove("on")); if (on) b.classList.add("on"); };
+  [["#j-g", good, "good"], ["#j-b", bad, "warn"]].forEach(([sel, set, cls]) => $(sel).onclick = e => { const b = e.target.closest("[data-c]"); if (!b) return; const c = b.dataset.c; set.has(c) ? set.delete(c) : set.add(c); b.classList.toggle(cls, set.has(c)); });
+  const del = $("#j-del"); if (del) del.onclick = () => confirmSheet("Supprimer ce match ?", "Il disparaîtra du journal et des statistiques.", "Supprimer", async () => { S.journal = S.journal.filter(x => x.id !== j.id); await saveJournal(); renderJournal(); });
+}
+function countCoups(list, k) {
+  const m = {}; for (const j of list) for (const c of j[k] || []) m[c] = (m[c] || 0) + 1;
+  return Object.entries(m).sort((a, b) => b[1] - a[1]);
+}
+function barsHtml(entries, color) {
+  if (!entries.length) return `<p class="small muted" style="margin:0">Rien de noté pour l'instant.</p>`;
+  const max = entries[0][1];
+  return entries.slice(0, 5).map(([c, n]) => `<div class="hbar"><span>${esc(c)}</span><i style="width:${Math.max(8, n / max * 100)}%;background:${color}"></i><b class="num">${n}</b></div>`).join("");
+}
+function renderJournal() {
+  const all = S.journal || [];
+  const since = isoDate(new Date(Date.now() - 60 * DAY)), recent = all.filter(j => j.date >= since);
+  const V = recent.filter(j => j.res === "V").length, D = recent.filter(j => j.res === "D").length;
+  const bad = countCoups(recent, "bad"), good = countCoups(recent, "good");
+  const todo = matchToNote();
+  const focus = bad[0] && bad[0][1] >= 2 ? `<div class="notice small"><b>À travailler en priorité : ${esc(bad[0][0].toLowerCase())}</b> (noté ${bad[0][1]} fois en 2 mois)${bad[1] && bad[1][1] >= 2 ? `, puis ${esc(bad[1][0].toLowerCase())}` : ""}. Demande à ton coach d'en faire le thème de tes prochains cours.</div>` : "";
+  const list = all.map(j => `<button class="jcard" type="button" data-j="${j.id}" style="text-align:left;color:inherit;font:inherit">
+    <div class="row between"><div class="row">${j.res ? `<span class="res ${j.res}">${j.res}</span>` : ""}<div><b>${frDate(j.date)}</b> · ${{ match: "Match", tournoi: "Tournoi", entrainement: "Entraînement" }[j.type] || "Match"}<div class="small muted">${[j.partner && "avec " + esc(j.partner), j.score && esc(j.score)].filter(Boolean).join(" · ")}</div></div></div>${j.feel ? `<span style="font-size:20px">${FORMS[j.feel - 1][1]}</span>` : ""}</div>
+    ${(j.good || []).length || (j.bad || []).length ? `<div class="cgrid">${(j.good || []).map(c => `<span class="chip good">${esc(c)}</span>`).join("")}${(j.bad || []).map(c => `<span class="chip warn">${esc(c)}</span>`).join("")}</div>` : ""}
+    ${j.note ? `<div class="small muted">${esc(j.note)}</div>` : ""}</button>`).join("");
+  app.innerHTML = `<div class="stack">
+    <h1>Historique</h1>${histSeg("journal")}
+    ${todo ? `<div class="notice info small">Tu as un ${todo.type === "tournoi" ? "tournoi" : "match"} ${frDate(todo.date)} pas encore noté.</div>` : ""}
+    <button class="btn primary block" id="j-add" type="button">+ Noter un match</button>
+    ${all.length ? `<div class="kpis"><div class="kpi"><b>${V} – ${D}</b><span>victoires – défaites (2 mois)</span></div><div class="kpi"><b>${recent.length}</b><span>matchs notés (2 mois)</span></div></div>
+    ${focus}
+    <h3>🔧 Le plus souvent à travailler</h3>${barsHtml(bad, "var(--warn)")}
+    <h3>✅ Tes points forts</h3>${barsHtml(good, "var(--good)")}
+    <h2>${all.length} match${all.length > 1 ? "s" : ""}</h2>${list}` : `<p class="muted">Après chaque match, note en 30 secondes ce qui a marché et ce qui a coincé. Au bout de quelques matchs, l'appli te montre tes points faibles récurrents, à travailler en cours.</p>`}
+  </div>`;
+  $("#j-add").onclick = () => journalSheet(todo ? { date: todo.date, type: todo.type } : {});
+  app.querySelectorAll("[data-j]").forEach(b => b.onclick = () => journalSheet(S.journal.find(x => x.id === b.dataset.j)));
+}
+
+/* ------------------------------------------------------------------ RAPPELS (notifications) */
+// L'appli calcule les rappels des 8 prochains jours et les dépose dans Firebase ;
+// la fonction « rappelsSallePadel » (projet les-mimichats) les envoie à l'heure prévue.
+const at = (iso, hm) => { const [y, m, d] = iso.split("-").map(Number); const [h, mi] = hm.split(":").map(Number); return new Date(y, m - 1, d, h, mi).getTime(); };
+const SESS_TXT = { A: "bas du corps + explosivité", B: "haut du corps + rotation", C: "vitesse, appuis, détente" };
+function buildReminders() {
+  const out = [], now = Date.now(), today = isoDate(new Date());
+  const add = (id, t, title, body, url = "./") => { if (t > now && t < now + 9 * DAY) out.push({ id, at: t, title, body, url }); };
+  // Séances de salle prévues cette semaine : la veille à 20 h
+  try { const wi = weekInfo(); if (wi && !wi.over) { const P = planWeek(wi);
+    for (const [d, k] of Object.entries(P.plan)) if (d > today) add(`gym-${d}-${k}`, at(plusDays(d, -1), "20:00"), `Demain : séance ${k}`, `${SESS_TXT[k][0].toUpperCase() + SESS_TXT[k].slice(1)}. Prépare ton sac !`, `./#seance-${k.toLowerCase()}`);
+  } } catch (e) {}
+  // Padel : avant-match, veille de tournoi, journal
+  for (let i = -1; i <= 8; i++) {
+    const d = plusDays(today, i);
+    for (const p of padelOn(d)) {
+      if (p.type !== "match" && p.type !== "tournoi") continue;
+      if (p.type === "tournoi") add(`tour-${d}`, at(plusDays(d, -1), "20:00"), "Tournoi demain 🏆", "Pas de séance jambes aujourd'hui, bois bien et couche-toi tôt.", "./#competition");
+      const start = p.time ? at(d, p.time) : at(d, p.type === "tournoi" ? "08:00" : "18:00");
+      if (p.time) add(`pre-${d}-${p.id}`, start - 75 * 60000, `${p.type === "tournoi" ? "Tournoi" : "Match"} à ${p.time.replace(":", "h")}`, "En arrivant, lance l'échauffement avant-match (8 min).", "./#accueil");
+      if (!(S.journal || []).some(j => j.date === d)) {
+        const endT = p.time ? start + ((+p.dur || 90) + 90) * 60000 : at(plusDays(d, 1), "12:00");
+        add(`note-${d}`, Math.min(endT, at(d, "22:30")) > start ? Math.min(endT, at(d, "22:30")) : at(plusDays(d, 1), "12:00"), "Note ton match 📝", "30 secondes : ce qui a marché, ce qui a coincé.", "./#journal");
+      }
+    }
+  }
+  // Pesée : lundi 8 h
+  const nextMon = (() => { let d = isoDate(mondayOf(new Date())); if (weekWeight() || now >= at(d, "08:00")) d = plusDays(d, 7); return d; })();
+  add(`weigh-${nextMon}`, at(nextMon, "08:00"), "Pesée de la semaine ⚖️", "Le matin à jeun, après être passé aux toilettes.", "./#tests");
+  // Séance maison : jeudi 18 h 30 si l'objectif de la semaine n'est pas atteint
+  const thu = plusDays(isoDate(mondayOf(new Date())), 3);
+  if (homeThisWeek() < HOME_TARGET) add(`home-${thu}`, at(thu, "18:30"), "Séance M ce soir ?", `${homeThisWeek()}/${HOME_TARGET} cette semaine. 20 min à la maison pour tes appuis.`, "./#seance-m");
+  return out.sort((a, b) => a.at - b.at);
+}
+const pushRef = () => Store.db.collection("sallePadel").doc(Store.user.uid).collection("push");
+let remT = null;
+function syncReminders() {
+  if (Store.mode !== "db" || !Store.lsGet("pushOn")) return;
+  clearTimeout(remT); remT = setTimeout(() => {
+    const items = buildReminders(), sig = JSON.stringify(items);
+    if (sig === Store.lsGet("pushSig")) return;
+    pushRef().doc("plan").set({ items, updated: Date.now() }, { merge: true }).then(() => Store.lsSet("pushSig", sig)).catch(() => {});
+  }, 1500);
+}
+async function enablePush() {
+  if (Store.mode !== "db") { toast("Active d'abord la synchro"); return; }
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !firebase.messaging?.isSupported?.()) {
+    toast(navigator.standalone === false ? "Ouvre l'appli depuis son icône sur l'écran d'accueil" : "Notifications non disponibles sur cet appareil"); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") { toast("Notifications refusées : Réglages iPhone → Salle Padel → Notifications"); return; }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const token = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    const id = token.slice(-24).replace(/[^A-Za-z0-9_-]/g, "_");
+    await pushRef().doc("dev-" + id).set({ token, at: Date.now(), ua: navigator.userAgent.slice(0, 120) });
+    Store.lsSet("pushOn", true); Store.lsSet("pushSig", null); syncReminders(); toast("Rappels activés"); renderSettings();
+  } catch (e) { toast("Activation impossible : " + (e.code || e.message || "erreur")); }
+}
+
+/* ------------------------------------------------------------------ BILAN DU MOIS */
+let bilanMonth = null;
+function weekComplete(monIso) {
+  const sun = plusDays(monIso, 6);
+  const done = new Set(S.logs.filter(l => ORDER.includes(l.session)).filter(l => { const d = isoDate(new Date(l.date)); return d >= monIso && d <= sun; }).map(l => l.session));
+  const tour = (S.comp?.results || []).concat(S.comp?.upcoming || []).some(t => t.date >= monIso && t.date <= sun);
+  return ORDER.filter(k => !(tour && k === "A")).every(k => done.has(k));
+}
+function streak() {
+  let mon = plusDays(isoDate(mondayOf(new Date())), -7), n = 0;
+  if (weekComplete(isoDate(mondayOf(new Date())))) n++;
+  while (weekComplete(mon) && n < 200) { n++; mon = plusDays(mon, -7); }
+  return n;
+}
+function renderBilan() {
+  const now = new Date(); const ym = bilanMonth || isoDate(now).slice(0, 7);
+  const [y, m] = ym.split("-").map(Number);
+  const first = `${ym}-01`, last = isoDate(new Date(y, m, 0, 12)), today = isoDate(now);
+  const inM = d => d >= first && d <= last;
+  const logs = S.logs.filter(l => inM(isoDate(new Date(l.date))));
+  const gym = logs.filter(l => ORDER.includes(l.session)).length, home = logs.filter(l => l.session === "M").length;
+  // séances prévues : 3 par semaine (2 en semaine de tournoi), semaines commencées dans le mois jusqu'à aujourd'hui
+  let planned = 0, full = 0, weeks = 0;
+  // on ne compte qu'à partir du début du programme
+  const starts = [S.settings?.startDate, ...S.logs.map(l => isoDate(new Date(l.date)))].filter(Boolean).sort();
+  const progMon = starts.length ? isoDate(mondayOf(parseISO(starts[0]))) : today;
+  for (let d = isoDate(mondayOf(parseISO(first))); d <= last && d <= today; d = plusDays(d, 7)) {
+    if (plusDays(d, 6) < first || d < progMon) continue;
+    const sun = plusDays(d, 6), tour = (S.comp?.results || []).concat(S.comp?.upcoming || []).some(t => t.date >= d && t.date <= sun);
+    planned += tour ? 2 : 3; if (sun < today) { weeks++; if (weekComplete(d)) full++; }
+  }
+  const pct = planned ? Math.round(gym / planned * 100) : 0;
+  // records : meilleure charge du mois > meilleure charge avant le mois
+  const recs = [];
+  for (const [id, name] of TRACKED) {
+    let before = null, during = null;
+    for (const l of S.logs) { const d = isoDate(new Date(l.date)); const kg = (l.entries?.[id] || []).filter(s => s.done && s.kg != null).map(s => s.kg); if (!kg.length) continue; const mx = Math.max(...kg);
+      if (d < first) before = Math.max(before ?? -1, mx); else if (inM(d)) during = Math.max(during ?? -1, mx); }
+    if (during != null && before != null && during > before) recs.push(`${name} : <b>${fmt(during)} kg</b> <span class="muted">(avant ${fmt(before)})</span>`);
+    else if (during != null && before == null && during > 0) recs.push(`${name} : <b>${fmt(during)} kg</b> <span class="muted">(première fois)</span>`);
+  }
+  const ws = (S.weights || []).filter(w => inM(w.date)).sort((a, b) => a.date.localeCompare(b.date));
+  const prevW = (S.weights || []).filter(w => w.date < first).sort((a, b) => a.date.localeCompare(b.date)).pop();
+  const wRef = prevW || ws[0], wLast = ws[ws.length - 1];
+  const wTxt = wLast && wRef && wLast !== wRef ? `${wLast.kg - wRef.kg >= 0 ? "+" : ""}${fmt(Math.round((wLast.kg - wRef.kg) * 10) / 10)} kg` : wLast ? fmt(wLast.kg) + " kg" : "–";
+  const res = (S.comp?.results || []).filter(r => inM(r.date)), pts = res.reduce((a, r) => a + (+r.pts || 0), 0);
+  const hist = (S.comp?.history || []).slice().sort((a, b) => a.month.localeCompare(b.month));
+  const hNow = hist.filter(h => h.month <= ym).pop(), hPrev = hist.filter(h => h.month < (hNow?.month || ym)).pop();
+  const jr = (S.journal || []).filter(j => inM(j.date)), V = jr.filter(j => j.res === "V").length, D = jr.filter(j => j.res === "D").length;
+  const bad = countCoups(jr, "bad");
+  const label = new Date(y, m - 1, 15).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const prevYm = isoDate(new Date(y, m - 2, 15)).slice(0, 7), nextYm = isoDate(new Date(y, m, 15)).slice(0, 7);
+  const st = streak();
+  app.innerHTML = `<div class="stack">
+    <h1>Historique</h1>${histSeg("bilan")}
+    <div class="row between"><button class="btn sm ghost" id="b-prev" type="button">‹</button><h2 style="margin:0;text-transform:capitalize">${label}</h2><button class="btn sm ghost" id="b-next" type="button" ${nextYm > today.slice(0, 7) ? "disabled style='opacity:.3'" : ""}>›</button></div>
+    <div class="kpis">
+      <div class="kpi"><b>${gym}<small style="font-size:16px;color:var(--muted)"> / ${planned}</small></b><span>séances de salle (${pct} %)</span></div>
+      <div class="kpi"><b>${home}</b><span>séances maison</span></div>
+      <div class="kpi"><b>${full} / ${weeks}</b><span>semaines terminées complètes</span></div>
+      <div class="kpi"><b>${st} 🔥</b><span>semaine${st > 1 ? "s" : ""} complète${st > 1 ? "s" : ""} d'affilée</span></div>
+      <div class="kpi"><b>${wTxt}</b><span>poids sur le mois</span></div>
+      <div class="kpi"><b>${V} – ${D}</b><span>matchs notés (V – D)</span></div>
+    </div>
+    <h3>🏆 Records du mois</h3>
+    ${recs.length ? `<div class="stack" style="gap:6px">${recs.map(r => `<div class="small">${r}</div>`).join("")}</div>` : `<p class="small muted" style="margin:0">Pas de nouveau record ce mois-ci.</p>`}
+    <h3>🎾 Compétition</h3>
+    <div class="small">${res.length ? `${res.length} tournoi${res.length > 1 ? "s" : ""} joué${res.length > 1 ? "s" : ""}, <b>${pts} points</b> gagnés.` : "Pas de tournoi noté ce mois-ci."}${hNow ? `<br>Classement : <b>${Number(hNow.rank).toLocaleString("fr-FR")}<sup>e</sup></b>${hPrev ? ` (${hPrev.rank - hNow.rank >= 0 ? "+" : ""}${(hPrev.rank - hNow.rank).toLocaleString("fr-FR")} places)` : ""}` : ""}</div>
+    ${bad.length ? `<h3>🔧 À travailler ce mois-ci</h3>${barsHtml(bad, "var(--warn)")}` : ""}
+  </div>`;
+  $("#b-prev").onclick = () => { bilanMonth = prevYm; renderBilan(); };
+  $("#b-next").onclick = () => { if (nextYm <= today.slice(0, 7)) { bilanMonth = nextYm; renderBilan(); } };
 }
 
 /* ------------------------------------------------------------------ COMPÉTITION */
@@ -1606,6 +1855,10 @@ function renderSettings() {
     <button class="btn primary block" id="set-save" type="button">Enregistrer</button>
     <h2 style="margin-top:12px">Synchro</h2>
     ${syncHtml()}
+    <h2 style="margin-top:12px">Rappels</h2>
+    ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro ci-dessus : les rappels passent par ton compte.</p>`
+      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li></ul></div><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
+      : `<p class="small muted" style="margin:0">Séance du lendemain, échauffement avant un match, pesée du lundi, match à noter… L'appli doit être ouverte depuis son icône sur l'écran d'accueil.</p><button class="btn primary block" id="push-on" type="button">Activer les rappels</button>`}
     <h2 style="margin-top:12px">Nouveau cycle</h2>
     <p class="small muted" style="margin:0">Tu es au cycle ${cycleNo()}. Repars en semaine 1 aujourd'hui : un cycle sur deux, quelques exercices changent. Historique et charges conservés.</p>
     <button class="btn ghost block" id="set-restart" type="button">Lancer le cycle ${cycleNo() + 1}</button>
@@ -1619,7 +1872,7 @@ function renderSettings() {
     <p class="sync">${Store.mode === "db" ? "Sauvegardé sur ton compte, sur tous tes appareils." : "Données sur cet appareil uniquement."}</p>
   </div>`;
   $("#bk-copy").onclick = async () => {
-    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: S.logs.map(({ _id, ...l }) => ({ ...l, _id })), current: S.current, comp: S.comp, padel: S.padel, weights: S.weights });
+    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: S.logs.map(({ _id, ...l }) => ({ ...l, _id })), current: S.current, comp: S.comp, padel: S.padel, weights: S.weights, journal: S.journal });
     try { await navigator.clipboard.writeText(data); toast("Sauvegarde copiée"); }
     catch (e) { $("#bk-in").value = data; $("#bk-in").select(); toast("Copie-la depuis le champ"); }
   };
@@ -1627,7 +1880,7 @@ function renderSettings() {
     let d; try { d = JSON.parse($("#bk-in").value); } catch (e) { toast("Sauvegarde illisible"); return; }
     if (!d || !d.settings) { toast("Sauvegarde illisible"); return; }
     confirmSheet("Restaurer cette sauvegarde ?", "Elle remplace les données actuelles de l'appli.", "Restaurer", async () => {
-      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel); if (d.weights) Store.lsSet("weights", d.weights);
+      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel); if (d.weights) Store.lsSet("weights", d.weights); if (d.journal) Store.lsSet("journal", d.journal);
       if (Store.mode === "db") await Store.upload().catch(() => {});
       location.reload();
     });
@@ -1644,6 +1897,7 @@ function renderSettings() {
     try { await Store.auth.signInWithEmailAndPassword(em, pw); toast("Connecté, je synchronise…"); setTimeout(() => location.reload(), 600); }
     catch (e) { li.disabled = false; li.textContent = "Se connecter"; toast(e.code === "auth/network-request-failed" ? "Pas de connexion internet" : "E-mail ou mot de passe incorrect"); }
   };
+  const po = $("#push-on"); if (po) po.onclick = () => enablePush();
   const lo = $("#sy-out"); if (lo) lo.onclick = () => confirmSheet("Se déconnecter ?", "Tes données restent sur ton compte et sur ce téléphone.", "Se déconnecter", async () => { await Store.auth.signOut(); location.reload(); });
 }
 
@@ -1671,6 +1925,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && T.
     const [settings, current, tests, logs] = await Promise.all([Store.get("settings"), Store.get("current"), Store.get("tests"), Store.logs()]);
     S.padel = (await Store.get("padel")) || [];
     S.weights = (await Store.get("weights")) || [];
+    S.journal = (await Store.get("journal")) || [];
     S.comp = (await Store.get("comp")) || seedComp(); if (!(await Store.get("comp"))) Store.set("comp", S.comp);
     S.settings = settings; S.current = current; S.tests = tests || {}; S.logs = logs || [];
   } catch (e) { if (Store.mode === "db") S.loadError = true; }
