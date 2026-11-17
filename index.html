@@ -419,7 +419,7 @@ PROGRAM.M = {
         why: "Des pieds plus rapides pour te replacer",
         how: "Des petits sauts très rapides par-dessus une ligne au sol, 20 secondes à fond.",
         setup: "Trouve une ligne au sol : un joint de carrelage, le bord d'une latte de parquet, ou pose une chaussette par terre. Mets-toi juste à côté.",
-        steps: ["Série 1 : pieds joints, saute à gauche de la ligne puis à droite, et ainsi de suite, le plus vite possible.", "Série 2 : pieds joints, saute devant la ligne puis derrière.", "Série 3 : en ciseaux. Un pied devant la ligne, l'autre derrière, et tu inverses les pieds en sautant, le plus vite possible.", "Coche la case après chaque série et récupère pendant le chrono."],
+        steps: ["Change de variante à chaque série, dans cet ordre (s'il y a moins de séries ce jour-là, fais seulement les premières) :", "1re série : pieds joints, saute à gauche de la ligne puis à droite, et ainsi de suite, le plus vite possible.", "2e série : pieds joints, saute devant la ligne puis derrière.", "3e série : en ciseaux. Un pied devant la ligne, l'autre derrière, et tu inverses les pieds en sautant, le plus vite possible.", "Coche la case après chaque série et récupère pendant le chrono."],
         feel: "Les mollets qui chauffent et le souffle court à la fin des 20 secondes.",
         cues: ["Reste sur l'avant des pieds, talons décollés.", "Saute à peine : 2-3 cm du sol suffisent, c'est la vitesse qui compte.", "Bras souples, regard devant toi, pas sur tes pieds."],
         video: yt("exercice pieds rapides ligne au sol") },
@@ -659,7 +659,8 @@ function presc(ex, wi) {
   if (ex.kind !== "interval") {
     if (wi.deload) sets = Math.max(2, Math.round(sets * 0.6));
     if (wi.tournament) sets = Math.max(1, Math.ceil(sets / 2));
-    if ((wi.fatigue || wi.lowForm) && !wi.deload && !wi.tournament) sets = Math.max(2, sets - 1);
+    const home = ex.id.startsWith("m-");
+    if (((wi.fatigue && !home) || wi.lowForm) && !wi.deload && !wi.tournament) sets = Math.max(2, sets - 1);
     if (wi.form === 1) sets = Math.max(1, sets - 1);
   } else {
     if (wi.lowForm) sets = Math.max(4, Math.round(sets * 0.6));
@@ -969,7 +970,7 @@ function renderSession(key) {
     ${(() => { const f = sessionFit(key, isoDate(new Date())); return !f.ok ? `<div class="notice small"><b>À éviter aujourd'hui</b> : ${esc(f.why)}. Regarde « Ta semaine » pour le meilleur jour.</div>` : f.pen >= 3 ? `<div class="notice small">Attention : ${esc(f.why)}. Écoute tes jambes et garde de la marge.</div>` : ""; })()}
     ${formHtml(cur)}
     ${wi.lowForm ? `<div class="notice small">Forme basse : ${wi.form === 1 ? "deux séries de moins" : "une série de moins"} par exercice, mêmes charges ou un cran en dessous. Si ça ne passe vraiment pas, une séance M ou du repos valent mieux.</div>` : ""}
-    ${wi.fatigue && !wi.lowForm && !wi.deload && !wi.tournament ? `<div class="notice info small">Padel aujourd'hui ou grosse séance hier : une série de moins par exercice.</div>` : ""}
+    ${wi.fatigue && key !== "M" && !wi.lowForm && !wi.deload && !wi.tournament ? `<div class="notice info small">Padel aujourd'hui ou grosse séance hier : une série de moins par exercice.</div>` : ""}
     ${key === "C" && wi.padelWeek >= 180 ? `<div class="notice info small">Tu as beaucoup de padel cette semaine : le cardio de fin est divisé par deux.</div>` : ""}
     ${p.intro ? `<details class="how" style="border:1px solid var(--line);border-radius:var(--r)" ${S.logs.some(l => l.session === key) ? "" : "open"}><summary>Comment se passe la séance</summary><div class="how-body"><ul style="margin:0">${p.intro.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div></details>` : ""}
     ${p.warning ? `<div class="notice ${key === "A" ? "" : "info"} small">${p.warning}</div>` : ""}
