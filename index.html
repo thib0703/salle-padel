@@ -1604,7 +1604,7 @@ async function enablePush() {
 // Eau : verres de 25 cl notés dans l'appli. Objectifs plus hauts les jours d'entraînement.
 const STEPS_FN = "https://europe-west9-les-mimichats.cloudfunctions.net/pasSallePadel";
 const SHORTCUT_NAME = "Pas Salle Padel";
-const HDEF = { stepGoal: 8000, restBonus: 2000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30" };
+const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30" };
 const H = () => ({ ...HDEF, ...(S.health || {}) });
 function saveHealth() { return Store.set("health", S.health).catch(() => toast("Sauvegarde impossible")); }
 // Jours de salle (faits ou prévus cette semaine), calculés une fois
@@ -1707,7 +1707,7 @@ function healthSettingsHtml() {
   const h = H();
   const tog = (id, on, label, sub) => `<div class="toggle"><div><b>${label}</b><div class="small muted">${sub}</div></div><button class="sw" id="${id}" role="switch" aria-checked="${on}" aria-label="${label}"></button></div>`;
   return `<h2 style="margin-top:12px" id="health-set">Pas & hydratation</h2>
-    <div class="row"><label class="fld" style="flex:1">Objectif de pas${inp("hs-sg", "8000", h.stepGoal, "numeric")}</label><label class="fld" style="flex:1">+ jours de repos${inp("hs-rb", "2000", h.restBonus, "numeric")}</label></div>
+    <div class="row"><label class="fld" style="flex:1">Objectif de pas${inp("hs-sg", "12000", h.stepGoal, "numeric")}</label><label class="fld" style="flex:1">+ jours de repos${inp("hs-rb", "1000", h.restBonus, "numeric")}</label></div>
     <label class="fld">Eau par jour (litres, hors entraînement)${inp("hs-w", "2,5", String(h.waterL).replace(".", ","), "decimal")}</label>
     <p class="small muted" style="margin:-4px 0 0">Jour de salle ou de padel : +0,5 L. Jour de tournoi : +1 L.</p>
     ${tog("hs-hy", h.hydra, "Rappels pour boire", "Ils s'arrêtent dès que l'objectif du jour est atteint")}
