@@ -722,13 +722,13 @@ function presc(ex, wi) {
   let sets = ex.sets[wi.bloc];
   if (ex.kind !== "interval") {
     if (wi.deload) sets = Math.max(2, Math.round(sets * 0.6));
-    if (wi.tournament) sets = Math.max(1, Math.ceil(sets / 2));
+    if (wi.tournament) sets = Math.max(2, sets - 1);
     const home = ex.id.startsWith("m-");
     if (((wi.fatigue && !home) || wi.lowForm) && !wi.deload && !wi.tournament) sets = Math.max(2, sets - 1);
     if (wi.form === 1) sets = Math.max(1, sets - 1);
   } else {
     if (wi.lowForm) sets = Math.max(4, Math.round(sets * 0.6));
-    else if (wi.deload || wi.tournament) sets = Math.max(4, Math.round(sets * (wi.tournament ? 0.5 : 0.6)));
+    else if (wi.deload || wi.tournament) sets = Math.max(4, Math.round(sets * (wi.tournament ? 0.75 : 0.6)));
     else if (wi.padelWeek >= 180) sets = Math.max(4, Math.round(sets * 0.5));
   }
   return { sets, reps: ex.reps[wi.bloc] };
@@ -866,7 +866,7 @@ function planWeek(wi) {
   const days = Array.from({ length: 7 }, (_, i) => plusDays(mon, i));
   const done = doneThisWeek(wi);
   const doneDay = {}; for (const l of S.logs) if (l.week === wi.week && l.cycleStart === S.settings.startDate && ORDER.includes(l.session)) doneDay[isoDate(new Date(l.date))] = l.session;
-  let todo = ORDER.filter(k => !done.has(k) && !(wi.tournament && k === "A"));
+  let todo = ORDER.filter(k => !done.has(k));
   const free = days.filter(d => d >= todayIso && !doneDay[d]);
   const fixed = {}; if (S.current && todo.includes(S.current.session)) { fixed[todayIso] = S.current.session; todo = todo.filter(k => k !== S.current.session); }
   const avail = free.filter(d => !fixed[d]);
@@ -938,7 +938,7 @@ function padelSheet(p = {}, occ) {
 function renderHome() {
   const wi = weekInfo();
   const done = doneThisWeek(wi);
-  const order = ORDER.filter(k => !(wi.tournament && k === "A"));
+  const order = ORDER;
   const PW = padelWeekHtml(wi), P = PW.P;
   const upcoming = Object.entries(P.plan).sort((a, b) => a[0].localeCompare(b[0]));
   const next = upcoming[0]?.[1] || order.find(k => !done.has(k));
@@ -955,7 +955,7 @@ function renderHome() {
   if (wi.tournament) chips.push(`<span class="chip warn">Semaine de tournoi</span>`);
   if (S.current) chips.push(`<span class="chip ball">Séance ${S.current.session} en cours</span>`);
   const cards = ORDER.map(k => {
-    const p = PROGRAM[k]; const isDone = done.has(k); const skip = wi.tournament && k === "A";
+    const p = PROGRAM[k]; const isDone = done.has(k); const skip = false;
     const status = S.current?.session === k ? `<span class="chip ball">En cours</span>` : isDone ? `<span class="chip good">Faite</span>` : skip ? `<span class="chip">À sauter</span>` : `<span class="arrow">›</span>`;
     return `<a class="sess ${k === next && !S.current ? "next" : ""} ${skip ? "skip" : ""}" href="#seance-${k.toLowerCase()}">
       <div class="letter">${k}</div>
@@ -986,7 +986,7 @@ function renderHome() {
       <div><h3>${m.sub}</h3><div class="small muted">${m.dur} · ${h}/${HOME_TARGET} cette semaine</div></div>
       ${S.current?.session === "M" ? `<span class="chip ball">En cours</span>` : h >= HOME_TARGET ? `<span class="chip good">${h} faite${h > 1 ? "s" : ""}</span>` : `<span class="arrow">›</span>`}</a>`; })()}
     ${wi.deload ? `<div class="notice info small">Semaine allégée : mêmes exercices et mêmes charges, moins de séries. C'est aussi la semaine des tests.</div>` : ""}
-    <div class="toggle"><div><b>Semaine de tournoi</b><div class="small muted">Saute la séance A, B et C à moitié du volume.</div></div><button class="sw" id="tw" role="switch" aria-checked="${wi.tournament}" aria-label="Semaine de tournoi"></button></div>
+    <div class="toggle"><div><b>Semaine de tournoi</b><div class="small muted">Les 3 séances restent, avec une série de moins par exercice. La séance jambes est placée loin du tournoi.</div></div><button class="sw" id="tw" role="switch" aria-checked="${wi.tournament}" aria-label="Semaine de tournoi"></button></div>
     ${recent ? `<div class="stack" style="gap:6px"><h3>Dernières séances</h3>${recent}</div>` : ""}
     <p class="sync">${Store.mode === "db" ? "Synchronisé sur ton compte, sur tous tes appareils." : "Sauvegarde sur cet appareil uniquement."}</p>
   </div>`;
@@ -1530,7 +1530,7 @@ function buildReminders() {
     const d = plusDays(today, i);
     for (const p of padelOn(d)) {
       if (p.type !== "match" && p.type !== "tournoi") continue;
-      if (p.type === "tournoi") add(`tour-${d}`, at(plusDays(d, -1), "20:00"), "Tournoi demain 🏆", "Pas de séance jambes aujourd'hui, bois bien et couche-toi tôt.", "./#competition");
+      if (p.type === "tournoi") add(`tour-${d}`, at(plusDays(d, -1), "20:00"), "Tournoi demain 🏆", "Bois bien et couche-toi tôt.", "./#competition");
       const start = p.time ? at(d, p.time) : at(d, p.type === "tournoi" ? "08:00" : "18:00");
       if (p.time) add(`pre-${d}-${p.id}`, start - 75 * 60000, `${p.type === "tournoi" ? "Tournoi" : "Match"} à ${p.time.replace(":", "h")}`, "En arrivant, lance l'échauffement avant-match (8 min).", "./#accueil");
       if (!(S.journal || []).some(j => j.date === d)) {
@@ -1823,7 +1823,7 @@ function weekComplete(monIso) {
   const sun = plusDays(monIso, 6);
   const done = new Set(S.logs.filter(l => ORDER.includes(l.session)).filter(l => { const d = isoDate(new Date(l.date)); return d >= monIso && d <= sun; }).map(l => l.session));
   const tour = (S.comp?.results || []).concat(S.comp?.upcoming || []).some(t => t.date >= monIso && t.date <= sun);
-  return ORDER.filter(k => !(tour && k === "A")).every(k => done.has(k));
+  return ORDER.every(k => done.has(k));
 }
 function streak() {
   let mon = plusDays(isoDate(mondayOf(new Date())), -7), n = 0;
@@ -1846,7 +1846,7 @@ function renderBilan() {
   for (let d = isoDate(mondayOf(parseISO(first))); d <= last && d <= today; d = plusDays(d, 7)) {
     if (plusDays(d, 6) < first || d < progMon) continue;
     const sun = plusDays(d, 6), tour = (S.comp?.results || []).concat(S.comp?.upcoming || []).some(t => t.date >= d && t.date <= sun);
-    planned += tour ? 2 : 3; if (sun < today) { weeks++; if (weekComplete(d)) full++; }
+    planned += 3; if (sun < today) { weeks++; if (weekComplete(d)) full++; }
   }
   const pct = planned ? Math.round(gym / planned * 100) : 0;
   // records : meilleure charge du mois > meilleure charge avant le mois
