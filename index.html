@@ -255,6 +255,17 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .th .sw4 span { width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(255,255,255,.15); }
 .th b { font-family: var(--display); font-size: 18px; }
 .th small { font-size: 12px; opacity: .8; }
+/* Détente vidéo */
+.jv { position: fixed; inset: 0; z-index: 44; background: var(--court); display: none; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.jv.on { display: block; }
+.jv-in { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 30px); display: flex; flex-direction: column; gap: 12px; }
+#jv-work { display: flex; flex-direction: column; gap: 10px; }
+#jv-work[hidden] { display: none; }
+#jv-v { width: 100%; max-height: 52vh; background: #000; border-radius: 12px; object-fit: contain; }
+.jv-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.jv-steps .btn { padding: 14px 4px; font-size: 18px; }
+.jv-marks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.jv-marks small { display: block; font-weight: 500; font-size: 12px; opacity: .8; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -291,6 +302,7 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
   <div class="rx-txt" id="rx-txt"></div>
   <div class="row" id="rx-btns"></div>
 </div>
+<div class="jv" id="jv" role="dialog"></div>
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
 
@@ -586,7 +598,7 @@ const vx = ex => cycleNo() % 2 === 0 && VARIANTS[ex.id] ? { ...ex, ...VARIANTS[e
 const BLOCS = ["Base", "Force", "Puissance"];
 const ORDER = ["A", "B", "C"];
 const TESTS = [
-  ["jump", "Détente verticale", "cm · My Jump ou marque au mur"],
+  ["jump", "Détente verticale", "cm · mesure vidéo ci-dessus"],
   ["agility", "Agilité 5-10-5", "s · chronométré"],
   ["spider", "Spider drill padel", "s · sur le terrain"],
   ["squat5", "Squat", "kg × 5 rép. propres"],
@@ -1398,6 +1410,7 @@ function renderTests() {
   <div class="stack">
     <h1>Tests</h1>
     ${cardHtml()}
+    ${jumpHtml()}
     ${reflexHtml()}
     ${weightHtml()}
     <h2 style="margin-top:8px">Tests toutes les 4 semaines</h2>
@@ -1408,7 +1421,7 @@ function renderTests() {
     <div class="notice info small"><b>Agilité 5-10-5 :</b> 5 m à droite, 10 m à gauche, 5 m pour revenir au centre, chronométré.<br><b>Spider drill :</b> sur une moitié de terrain, pars du centre de la ligne de service et va toucher 5 points en étoile (les deux coins du filet, les deux coins du fond, le milieu du fond), retour au centre à chaque fois. Le test qui suit ta motricité. Prends aussi des photos de face, profil et dos, toujours avec la même lumière.</div>
   </div>`;
   drawWeights();
-  bindCard(); bindReflex();
+  bindCard(); bindReflex(); bindJump();
   $("#w-save").onclick = async () => {
     const kg = num($("#w-kg").value || $("#w-kg").placeholder); if (kg == null || kg < 30 || kg > 250) { toast("Entre ton poids en kg"); return; }
     const mon = isoDate(mondayOf(new Date()));
@@ -2216,6 +2229,125 @@ function bindRackets() {
   app.querySelectorAll("[data-rkmain]").forEach(b => b.onclick = async () => { setMain(b.dataset.rkmain); await saveExtras(); toast("Raquette principale changée"); renderComp(); });
   app.querySelectorAll("[data-rkgrip]").forEach(b => b.onclick = async () => { S.extras.rackets.find(x => x.id === b.dataset.rkgrip).gripAt = isoDate(new Date()); await saveExtras(); toast("Surgrip noté, compteur remis à zéro"); renderComp(); });
 }
+
+// ---- Détente par vidéo (temps de vol, méthode My Jump) : h = g·t²/8
+const JV = {};
+const jumpCm = t => Math.round(9.81 * t * t / 8 * 1000) / 10;
+function jumpCol() { const wi = weekInfo(); const cw = wi ? wi.cw : 1; return cw >= 12 ? "w12" : cw >= 8 ? "w8" : cw >= 4 ? "w4" : "w0"; }
+function jumpHtml() {
+  const list = (S.extras?.jumps || []).slice(-4).reverse();
+  const best = (S.extras?.jumps || []).reduce((m, j) => Math.max(m, j.cm), 0);
+  return `<h2 style="margin-top:8px">Détente</h2>
+    <div class="ex" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+      <p class="small muted" style="margin:0">Filme ton saut en <b>Ralenti</b> avec l'appareil photo, puis importe la vidéo : tu marques le décollage et l'atterrissage, l'appli calcule ta hauteur avec le temps de vol.</p>
+      <button class="btn primary block" id="jv-open" type="button">📹 Mesurer un saut${best ? `<small style="display:block;font-weight:500;font-size:12px">record ${fmt(best)} cm</small>` : ""}</button>
+      ${list.length ? `<div class="stack" style="gap:4px">${list.map(j => `<div class="row between small"><span>${frDate(j.date)}</span><span><b>${fmt(j.cm)} cm</b> <span class="muted">· ${Math.round(j.t * 1000)} ms en l'air</span></span></div>`).join("")}</div>` : ""}
+      <details class="how" style="border:1px solid var(--line);border-radius:10px"><summary>Bien filmer pour une mesure fiable</summary><div class="how-body small"><ul>
+        <li>Appareil photo en mode <b>Ralenti</b> (240 i/s si possible : Réglages › Appareil photo › Ralenti).</li>
+        <li>Téléphone posé au sol ou calé, à 1-2 m, cadré sur tes pieds. Pas tenu à la main.</li>
+        <li>Mains sur les hanches, flexion libre, saut au max. Toujours le même saut.</li>
+        <li>Atterris jambes tendues, sur les pointes. Genoux pliés en l'air = hauteur gonflée.</li>
+        <li>3 sauts dans la même vidéo, 20-30 s de repos entre chaque : tu les mesures à la suite et on garde le meilleur.</li>
+      </ul></div></details>
+    </div>`;
+}
+function bindJump() { $("#jv-open").onclick = openJump; }
+function openJump() {
+  Object.assign(JV, { url: null, fd: 1 / 30, n: 0, frames: 0, a: null, b: null, f: null, jumps: [] });
+  $("#jv").classList.add("on"); document.body.style.overflow = "hidden";
+  $("#jv").innerHTML = `<div class="jv-in">
+    <div class="row between"><h2>Mesurer un saut</h2><button class="btn sm ghost" data-jv="close" type="button">Fermer</button></div>
+    <label class="btn primary block" style="position:relative">Choisir la vidéo au ralenti<input id="jv-file" type="file" accept="video/*" style="position:absolute;inset:0;opacity:0;width:100%"></label>
+    <p class="small muted" style="margin:0">Prends la vidéo dans ta photothèque. Si tu n'as pas encore filmé : appareil photo › Ralenti, téléphone posé, pieds dans le cadre.</p>
+    <div id="jv-work" hidden>
+      <video id="jv-v" playsinline muted preload="auto"></video>
+      <div class="row between small"><span id="jv-pos" class="num muted"></span><span id="jv-fps" class="muted"></span></div>
+      <input id="jv-range" type="range" min="0" value="0" step="1" style="width:100%">
+      <div class="jv-steps"><button class="btn" data-st="-10" type="button">−10</button><button class="btn" data-st="-1" type="button">‹ 1</button><button class="btn" data-st="1" type="button">1 ›</button><button class="btn" data-st="10" type="button">+10</button></div>
+      <div class="jv-marks">
+        <button class="btn" id="jv-a" type="button">🛫 Décollage ici<small id="jv-at">orteils quittent le sol</small></button>
+        <button class="btn" id="jv-b" type="button">🛬 Atterrissage ici<small id="jv-bt">orteils retouchent</small></button>
+      </div>
+      <div id="jv-res"></div>
+      <div id="jv-list"></div>
+    </div>
+  </div>`;
+  $("#jv-file").onchange = e => { const f = e.target.files[0]; if (f) loadJumpVideo(f); };
+}
+function closeJump() { const v = $("#jv-v"); if (v) { v.pause(); v.removeAttribute("src"); v.load(); } if (JV.url) URL.revokeObjectURL(JV.url); JV.url = null; $("#jv").classList.remove("on"); $("#jv").innerHTML = ""; document.body.style.overflow = ""; if (location.hash === "#tests") renderTests(); }
+async function loadJumpVideo(file) {
+  if (JV.url) URL.revokeObjectURL(JV.url);
+  JV.url = URL.createObjectURL(file); Object.assign(JV, { a: null, b: null, f: null, n: 0 });
+  const v = $("#jv-v"); $("#jv-work").hidden = false; $("#jv-pos").textContent = "Chargement…"; $("#jv-fps").textContent = "";
+  v.src = JV.url;
+  await new Promise(r => { v.onloadeddata = r; v.onerror = r; setTimeout(r, 8000); });
+  if (!v.duration || !isFinite(v.duration)) { $("#jv-pos").textContent = "Vidéo illisible, essaie une autre."; return; }
+  // Durée d'une image : on lit un court passage et on mesure l'écart entre images affichées
+  let fd = 1 / 30;
+  if (v.requestVideoFrameCallback) {
+    const ts = [];
+    await new Promise(res => {
+      const cb = (now, m) => { ts.push(m.mediaTime); if (ts.length < 24 && !v.paused) v.requestVideoFrameCallback(cb); else res(); };
+      v.requestVideoFrameCallback(cb); v.playbackRate = .25; v.play().catch(res); setTimeout(res, 2500);
+    });
+    v.pause(); v.playbackRate = 1;
+    const d = ts.slice(1).map((t, i) => t - ts[i]).filter(x => x > .0015).sort((a, b) => a - b);
+    if (d.length >= 3) fd = d[Math.floor(d.length * .2)];
+  }
+  JV.fd = fd; JV.frames = Math.max(1, Math.floor(v.duration / fd));
+  const fps = Math.round(1 / fd);
+  $("#jv-fps").textContent = fps + " images/s";
+  $("#jv-range").max = JV.frames - 1;
+  $("#jv-range").oninput = e => jvSeek(+e.target.value);
+  $("#jv").querySelectorAll("[data-st]").forEach(b => b.onclick = () => jvSeek(JV.n + +b.dataset.st));
+  $("#jv-a").onclick = () => { JV.a = JV.n; if (JV.b != null && JV.b <= JV.a) JV.b = null; jvResult(); };
+  $("#jv-b").onclick = () => { if (JV.a == null || JV.n <= JV.a) { toast("Marque d'abord le décollage, puis avance"); return; } JV.b = JV.n; jvResult(); };
+  jvSeek(0); jvResult();
+}
+function jvSeek(n) {
+  JV.n = Math.max(0, Math.min(JV.frames - 1, n));
+  const v = $("#jv-v"); v.currentTime = Math.min(v.duration - .001, (JV.n + .5) * JV.fd);
+  $("#jv-range").value = JV.n;
+  $("#jv-pos").textContent = `Image ${JV.n + 1} · ${(JV.n * JV.fd).toFixed(3).replace(".", ",")} s`;
+}
+// Une vidéo ralentie peut être exportée « étirée » (x4, x8) : on retrouve le facteur grâce aux temps de vol plausibles (0,3-0,85 s)
+function jvFactor(raw) { if (JV.f) return JV.f; for (const f of [1, 2, 4, 8]) { const t = raw / f; if (t >= .3 && t <= .85) return f; } return 1; }
+function jvResult() {
+  $("#jv-at").textContent = JV.a != null ? "image " + (JV.a + 1) : "orteils quittent le sol";
+  $("#jv-bt").textContent = JV.b != null ? "image " + (JV.b + 1) : "orteils retouchent";
+  $("#jv-a").classList.toggle("primary", JV.a != null); $("#jv-b").classList.toggle("primary", JV.b != null);
+  const el = $("#jv-res");
+  if (JV.a == null || JV.b == null) { el.innerHTML = `<p class="small muted" style="margin:0">Avance jusqu'à la <b>dernière image où les orteils touchent encore</b> le sol… puis +1 : c'est le décollage. Même chose à l'atterrissage : <b>première image où les orteils retouchent</b>.</p>`; jvList(); return; }
+  const raw = (JV.b - JV.a) * JV.fd, f = jvFactor(raw), t = raw / f, cm = jumpCm(t), realFps = Math.round(f / JV.fd);
+  const prec = jumpCm(t + 1 / realFps) - cm;
+  el.innerHTML = `<div class="week-head" style="padding:14px">
+      <div class="eyebrow">Hauteur</div>
+      <div class="row" style="align-items:baseline;gap:8px"><span class="big num">${fmt(cm)}</span><span class="muted">cm · ${Math.round(t * 1000)} ms en l'air</span></div>
+      <div class="row wrap" style="gap:6px;margin-top:8px">${[1, 4, 8].map(x => `<button type="button" class="chip ${x === f ? "ball" : ""}" data-fx="${x}" style="border:0">${x === 1 ? "Vitesse réelle" : "Ralenti ×" + x}</button>`).join("")}</div>
+      <p class="small muted" style="margin:8px 0 0">${f > 1 ? `Vidéo ralentie détectée (×${f}), corrigée automatiquement. ` : ""}${realFps < 100 ? `<span style="color:var(--warn)">Seulement ${realFps} images/s : précision ± ${fmt(Math.round(prec))} cm. Filme en mode Ralenti pour être précis.</span>` : `Précision ± ${fmt(Math.round(prec * 10) / 10)} cm (${realFps} images/s).`}${cm > 90 || cm < 10 ? ` <span style="color:var(--warn)">Résultat étonnant : vérifie tes deux images.</span>` : ""}</p>
+    </div>
+    <button class="btn primary block" id="jv-keep" type="button">Garder ce saut</button>`;
+  el.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { JV.f = +b.dataset.fx; jvResult(); });
+  $("#jv-keep").onclick = () => { JV.jumps.push({ cm, t: Math.round(t * 1000) / 1000 }); JV.a = JV.b = null; toast("Saut " + JV.jumps.length + " : " + fmt(cm) + " cm"); jvResult(); };
+  jvList();
+}
+function jvList() {
+  const el = $("#jv-list"); if (!JV.jumps.length) { el.innerHTML = ""; return; }
+  const best = JV.jumps.reduce((m, j) => j.cm > m.cm ? j : m), col = jumpCol(), colName = TCOLS.find(c => c[0] === col)[1];
+  const cur = num(S.tests?.jump?.[col]);
+  el.innerHTML = `<div class="notice info small" style="display:grid;gap:8px">
+    <div>${JV.jumps.map((j, i) => `Saut ${i + 1} : <b>${fmt(j.cm)} cm</b>`).join(" · ")}</div>
+    <div>Tu peux mesurer le saut suivant dans la même vidéo. Meilleur : <b>${fmt(best.cm)} cm</b>.</div>
+    <button class="btn primary block" id="jv-save" type="button">Enregistrer ${fmt(best.cm)} cm (colonne ${colName})</button>
+    ${cur != null ? `<span class="muted">Remplace les ${fmt(cur)} cm déjà notés dans cette colonne.</span>` : ""}</div>`;
+  $("#jv-save").onclick = async () => {
+    S.tests = S.tests || {}; S.tests.jump = { ...(S.tests.jump || {}), [col]: fmt(best.cm) };
+    S.extras.jumps = [...(S.extras.jumps || []), { date: isoDate(new Date()), cm: best.cm, t: best.t, all: JV.jumps.map(j => j.cm) }].slice(-60);
+    await Promise.all([Store.set("tests", S.tests), saveExtras()]).catch(() => toast("Sauvegarde impossible"));
+    toast("Détente enregistrée : " + fmt(best.cm) + " cm"); closeJump();
+  };
+}
+$("#jv").addEventListener("click", e => { if (e.target.closest('[data-jv="close"]')) closeJump(); });
 
 window.addEventListener("hashchange", route);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && T.h) tick(); });
