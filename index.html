@@ -125,7 +125,7 @@ details.how[open] summary::before { content: "− "; }
 .wname small { display: block; font-weight: 400; color: var(--muted); font-size: 13.5px; text-decoration: none; }
 .notice { border-radius: 12px; padding: 12px 14px; font-size: 14.5px; background: rgba(255,159,90,.12); border: 1px solid rgba(255,159,90,.4); }
 .notice.info { background: var(--court-2); border-color: var(--line); }
-.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: rgba(14,34,54,.96); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: rgba(14,34,54,.96); background: color-mix(in srgb, var(--court) 96%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 .timer { display: none; max-width: 560px; margin: 0 auto; padding: 10px 16px; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); }
 .timer.on { display: flex; }
 .timer .t { font-family: var(--display); font-size: 36px; font-weight: 700; min-width: 92px; font-variant-numeric: tabular-nums; }
@@ -210,6 +210,51 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .pg { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--ball); color: var(--ball-ink); font-family: var(--display); font-weight: 700; font-size: 18px; text-decoration: none; margin-top: auto; }
 .pg.done { background: var(--court-3); color: var(--good); font-size: 14px; width: auto; padding: 0 5px; }
 .pr { font-size: 10.5px; color: var(--muted); margin-top: auto; }
+/* Carte joueur */
+.pcard { --c1: #E3A970; --c2: #9A5B2E; --ink: #2A1408; width: 230px; margin: 4px auto 0; padding: 18px 18px 26px; color: var(--ink); background: linear-gradient(155deg, var(--c1), var(--c2)); clip-path: polygon(50% 0, 100% 6%, 100% 86%, 50% 100%, 0 86%, 0 6%); position: relative; border: 0; display: block; font: inherit; text-align: left; }
+.pcard.argent { --c1: #EEF1F4; --c2: #8E99A4; --ink: #1B2128; }
+.pcard.or { --c1: #FBEA8C; --c2: #C08F27; --ink: #2B1E02; }
+.pcard.elite { --c1: #2B2B33; --c2: #0B0B0E; --ink: #F3D46B; }
+.pcard::before { content: ""; position: absolute; inset: 7px; clip-path: inherit; border: 1.5px solid rgba(255,255,255,.35); pointer-events: none; }
+.pc-top { display: grid; grid-template-columns: 58px 1fr; gap: 6px; align-items: start; }
+.pc-ovr { font-family: var(--display); font-size: 46px; font-weight: 700; line-height: .9; }
+.pc-pos { font-family: var(--display); font-size: 18px; font-weight: 700; letter-spacing: .04em; }
+.pc-flag { font-size: 18px; margin-top: 2px; }
+.pc-art { display: grid; place-items: center; height: 104px; }
+.pc-art svg { width: 92px; height: 104px; }
+.pc-name { font-family: var(--display); font-size: 25px; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid currentColor; padding-bottom: 4px; margin: 4px 6px 8px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; padding: 0 8px; }
+.pc-stats div { display: flex; align-items: baseline; gap: 6px; font-family: var(--display); font-size: 19px; }
+.pc-stats b { font-size: 22px; min-width: 26px; }
+.pc-stats div.na { opacity: .45; }
+.pc-stats i { font-style: normal; font-size: 12px; color: #12693F; font-weight: 700; }
+.pcard.elite .pc-stats i { color: var(--good); }
+.pc-foot { text-align: center; font-size: 11.5px; font-weight: 700; margin-top: 8px; opacity: .8; }
+/* Réflexes */
+.rx { position: fixed; inset: 0; z-index: 45; background: var(--court); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.rx.on { display: flex; }
+.rx.go { background: var(--ball); color: var(--ball-ink); }
+.rx.early { background: var(--warn); color: #2A1300; }
+.rx-info { color: var(--muted); font-size: 15px; font-weight: 600; }
+.rx.go .rx-info { color: inherit; opacity: .7; }
+.rx-big { font-family: var(--display); font-size: min(30vw, 150px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.rx-big.arrow { font-size: min(60vw, 300px); }
+.rx-txt { font-size: 17px; max-width: 340px; }
+/* Raquettes */
+.rk { background: var(--court-2); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.rk.main { border-color: var(--ball); }
+.meter { height: 8px; border-radius: 4px; background: var(--court-3); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 4px; background: var(--good); }
+.meter i.warn { background: var(--warn); }
+/* Thèmes */
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.th { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; text-align: left; display: flex; flex-direction: column; gap: 6px; font: inherit; }
+.th.on { border-color: var(--ball); box-shadow: 0 0 0 1px var(--ball) inset; }
+.th.locked { opacity: .55; }
+.th .sw4 { display: flex; gap: 4px; }
+.th .sw4 span { width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(255,255,255,.15); }
+.th b { font-family: var(--display); font-size: 18px; }
+.th small { font-size: 12px; opacity: .8; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -239,6 +284,12 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
     <a href="#tests" data-tab="tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="7"/><path d="M12 13V9M10 3h4"/></svg>Tests</a>
     <a href="#reglages" data-tab="reglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Réglages</a>
   </nav>
+</div>
+<div class="rx" id="rx" role="dialog" aria-live="assertive">
+  <div class="rx-info" id="rx-info"></div>
+  <div class="rx-big" id="rx-big"></div>
+  <div class="rx-txt" id="rx-txt"></div>
+  <div class="row" id="rx-btns"></div>
 </div>
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
@@ -568,7 +619,7 @@ const FB_CONFIG = {
   appId: "1:564623606130:web:463f4d42b7e3748f2a5deb"
 };
 const VAPID_KEY = "BFakDRVHscjbCVzMvzc2N-p96sATx-RXyKwPLaAnA8uVzqfLS5e4jKVsFJDto_JNuZhhhdU85V2hi0QSICbxJK0";
-const SYNC_KEYS = ["settings", "current", "tests", "padel", "comp", "weights", "journal"];
+const SYNC_KEYS = ["settings", "current", "tests", "padel", "comp", "weights", "journal", "extras"];
 // Synchro Firebase (projet « les-mimichats », même compte que l'appli de couple).
 // Firestore refuse les tableaux imbriqués : chaque valeur est stockée en texte JSON.
 // localStorage reste toujours à jour : l'appli marche hors ligne et sans compte.
@@ -697,6 +748,7 @@ function route() {
   if (S.loadError) return renderError();
   if (!S.settings?.startDate && h !== "reglages") return renderOnboarding();
   window.scrollTo(0, 0);
+  checkUnlocks();
   if (h.startsWith("seance-")) { setTab(""); return renderSession(h.slice(7).toUpperCase()); }
   if (h === "historique") { setTab(h); return renderHistory(); }
   if (h === "journal") { setTab("historique"); return renderJournal(); }
@@ -912,6 +964,7 @@ function renderHome() {
     ${(() => { const today = padelOn(P.todayIso); const m = today.find(p => p.type === "match" || p.type === "tournoi");
       return `<div class="row"><button class="btn ${m ? "primary" : "ghost"}" id="prematch" type="button" style="flex:1">🔥 Avant-match<small style="display:block;font-weight:500;font-size:12px">8 min</small></button><button class="btn ghost" id="postmatch" type="button" style="flex:1">🧘 Récup après<small style="display:block;font-weight:500;font-size:12px">8 min</small></button></div>`; })()}
     ${(() => { const t = matchToNote(); return t ? `<button class="notice info small" id="note-match" type="button" style="text-align:left;color:inherit;font:inherit;width:100%">📝 Note ton ${t.type === "tournoi" ? "tournoi" : "match"} ${t.date === P.todayIso ? "d'aujourd'hui" : frDate(t.date)} : ce qui a marché, ce qui a coincé (30 s) ›</button>` : ""; })()}
+    ${gripNotice()}
     ${!weekWeight() ? `<a class="notice info small" href="#tests" style="display:block;text-decoration:none;color:inherit">⚖️ Pense à ta pesée de la semaine (prise de masse) ›</a>` : ""}
     <div class="row between"><h2>${headTxt}</h2><span class="small muted">${done.size}/${order.length} faites</span></div>
     ${cards}
@@ -1292,11 +1345,11 @@ function drawChart() {
   const area = line + ` L${x(pts.length - 1).toFixed(1)} ${H - pb} L${pl} ${H - pb} Z`;
   const L = pts[pts.length - 1];
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution de la charge">
-    ${ticks.map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#2C5277" stroke-width="1"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="#9DB2C6">${t}</text>`).join("")}
-    <path d="${area}" fill="rgba(244,209,61,.12)"/><path d="${line}" fill="none" stroke="#F4D13D" stroke-width="2.5" stroke-linejoin="round"/>
-    ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="${i === pts.length - 1 ? 5 : 2.5}" fill="#F4D13D"/>`).join("")}
-    <text x="${pl}" y="${H - 8}" font-size="11" fill="#9DB2C6">${pts[0].d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</text>
-    <text x="${W - pr}" y="${H - 8}" font-size="11" fill="#9DB2C6" text-anchor="end">${L.d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · ${fmt(L.v)} kg</text>
+    ${ticks.map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="${CV.line}" stroke-width="1"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="${CV.muted}">${t}</text>`).join("")}
+    <path d="${area}" fill="${CV.ballSoft}"/><path d="${line}" fill="none" stroke="${CV.ball}" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="${i === pts.length - 1 ? 5 : 2.5}" fill="${CV.ball}"/>`).join("")}
+    <text x="${pl}" y="${H - 8}" font-size="11" fill="${CV.muted}">${pts[0].d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</text>
+    <text x="${W - pr}" y="${H - 8}" font-size="11" fill="${CV.muted}" text-anchor="end">${L.d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · ${fmt(L.v)} kg</text>
   </svg>`;
 }
 
@@ -1333,10 +1386,10 @@ function drawWeights() {
   const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.kg).toFixed(1)).join(" ");
   const L = pts[pts.length - 1];
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution du poids">
-    ${[lo + .5, (lo + hi) / 2, hi - .5].map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#2C5277"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="#9DB2C6">${fmt(Math.round(t * 10) / 10)}</text>`).join("")}
-    <path d="${line}" fill="none" stroke="#F4D13D" stroke-width="2.5" stroke-linejoin="round"/>
-    ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.kg)}" r="${i === pts.length - 1 ? 5 : 2.5}" fill="#F4D13D"/>`).join("")}
-    <text x="${W - pr}" y="${H - 6}" font-size="11" fill="#9DB2C6" text-anchor="end">${parseISO(L.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · ${fmt(L.kg)} kg</text></svg>`;
+    ${[lo + .5, (lo + hi) / 2, hi - .5].map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="${CV.line}"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="${CV.muted}">${fmt(Math.round(t * 10) / 10)}</text>`).join("")}
+    <path d="${line}" fill="none" stroke="${CV.ball}" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.kg)}" r="${i === pts.length - 1 ? 5 : 2.5}" fill="${CV.ball}"/>`).join("")}
+    <text x="${W - pr}" y="${H - 6}" font-size="11" fill="${CV.muted}" text-anchor="end">${parseISO(L.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · ${fmt(L.kg)} kg</text></svg>`;
 }
 
 function renderTests() {
@@ -1344,6 +1397,8 @@ function renderTests() {
   app.innerHTML = `
   <div class="stack">
     <h1>Tests</h1>
+    ${cardHtml()}
+    ${reflexHtml()}
     ${weightHtml()}
     <h2 style="margin-top:8px">Tests toutes les 4 semaines</h2>
     <p class="muted">À refaire toutes les 4 semaines, pendant la semaine allégée.${wi.deload ? " <b style='color:var(--ball)'>C'est cette semaine.</b>" : ""}</p>
@@ -1353,6 +1408,7 @@ function renderTests() {
     <div class="notice info small"><b>Agilité 5-10-5 :</b> 5 m à droite, 10 m à gauche, 5 m pour revenir au centre, chronométré.<br><b>Spider drill :</b> sur une moitié de terrain, pars du centre de la ligne de service et va toucher 5 points en étoile (les deux coins du filet, les deux coins du fond, le milieu du fond), retour au centre à chaque fois. Le test qui suit ta motricité. Prends aussi des photos de face, profil et dos, toujours avec la même lumière.</div>
   </div>`;
   drawWeights();
+  bindCard(); bindReflex();
   $("#w-save").onclick = async () => {
     const kg = num($("#w-kg").value || $("#w-kg").placeholder); if (kg == null || kg < 30 || kg > 250) { toast("Entre ton poids en kg"); return; }
     const mon = isoDate(mondayOf(new Date()));
@@ -1748,6 +1804,7 @@ function renderComp() {
         <div class="row wrap" style="gap:8px">${p.licence ? `<button class="chip ball" data-copy="${esc(p.licence)}" type="button" style="border:0">Licence ${esc(p.licence)} · copier</button>` : `<button class="chip warn" data-pa="${p.id}" type="button" style="border:0">+ Ajouter la licence</button>`}${p.phone ? `<a class="chip" href="tel:${esc(p.phone.replace(/\s/g, ""))}" style="text-decoration:none">${esc(p.phone)}</a>` : ""}</div>
       </div>`; }).join("") || `<p class="muted small" style="margin:0">Ajoute tes partenaires pour avoir leur licence sous la main au moment de l'inscription.</p>`}
     ${partnerList()}
+    ${racketsHtml()}
 
     <details class="how" style="border:1px solid var(--line);border-radius:var(--r)"><summary>Mettre à jour les cuts (${monthLabel(c.cuts.month)})</summary><div class="how-body">
       <p class="small muted" style="margin:0">Chaque mois, padelspeak.com publie les cuts (points mini pour chaque top). Une ligne par palier : rang puis points, sans espace dans les nombres (ex. « 10000 991 »).</p>
@@ -1774,6 +1831,7 @@ function renderComp() {
     const now = new Date(); c.cuts = { month: now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0"), rows }; await saveComp(); toast("Cuts enregistrés"); renderComp();
   };
   if (c.history.length > 1) drawRankChart();
+  bindRackets();
 }
 
 function drawRankChart() {
@@ -1783,9 +1841,9 @@ function drawRankChart() {
   const x = i => pl + (W - pl - pr) * (i / (h.length - 1)); const y = v => pt + (H - pt - pb) * ((v - lo) / (hi - lo)); // meilleur rang en haut
   const line = h.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.rank).toFixed(1)).join(" ");
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution du classement">
-    ${[lo, hi].map(t => `<text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="#9DB2C6">${frNum(t)}</text><line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#2C5277"/>`).join("")}
-    <path d="${line}" fill="none" stroke="#F4D13D" stroke-width="2.5"/>
-    ${h.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.rank)}" r="3" fill="#F4D13D"/><text x="${x(i)}" y="${H - 6}" font-size="10" fill="#9DB2C6" text-anchor="middle">${monthLabel(p.month)}</text>`).join("")}
+    ${[lo, hi].map(t => `<text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="${CV.muted}">${frNum(t)}</text><line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="${CV.line}"/>`).join("")}
+    <path d="${line}" fill="none" stroke="${CV.ball}" stroke-width="2.5"/>
+    ${h.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.rank)}" r="3" fill="${CV.ball}"/><text x="${x(i)}" y="${H - 6}" font-size="10" fill="${CV.muted}" text-anchor="middle">${monthLabel(p.month)}</text>`).join("")}
   </svg>`;
 }
 
@@ -1866,6 +1924,7 @@ function renderSettings() {
   app.innerHTML = `
   <div class="stack">
     <h1>Réglages</h1>
+    ${themesHtml()}
     <label class="fld" for="set-week">Cette semaine, je suis en
       <select id="set-week">${opts}</select></label>
     <p class="small muted" style="margin:-4px 0 0">Change-la si tu as pris du retard (blessure, vacances) : la suite du programme se recale.</p>
@@ -1889,7 +1948,7 @@ function renderSettings() {
     <p class="sync">${Store.mode === "db" ? "Sauvegardé sur ton compte, sur tous tes appareils." : "Données sur cet appareil uniquement."}</p>
   </div>`;
   $("#bk-copy").onclick = async () => {
-    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: S.logs.map(({ _id, ...l }) => ({ ...l, _id })), current: S.current, comp: S.comp, padel: S.padel, weights: S.weights, journal: S.journal });
+    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: S.logs.map(({ _id, ...l }) => ({ ...l, _id })), current: S.current, comp: S.comp, padel: S.padel, weights: S.weights, journal: S.journal, extras: S.extras });
     try { await navigator.clipboard.writeText(data); toast("Sauvegarde copiée"); }
     catch (e) { $("#bk-in").value = data; $("#bk-in").select(); toast("Copie-la depuis le champ"); }
   };
@@ -1897,7 +1956,7 @@ function renderSettings() {
     let d; try { d = JSON.parse($("#bk-in").value); } catch (e) { toast("Sauvegarde illisible"); return; }
     if (!d || !d.settings) { toast("Sauvegarde illisible"); return; }
     confirmSheet("Restaurer cette sauvegarde ?", "Elle remplace les données actuelles de l'appli.", "Restaurer", async () => {
-      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel); if (d.weights) Store.lsSet("weights", d.weights); if (d.journal) Store.lsSet("journal", d.journal);
+      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel); if (d.weights) Store.lsSet("weights", d.weights); if (d.journal) Store.lsSet("journal", d.journal); if (d.extras) Store.lsSet("extras", d.extras);
       if (Store.mode === "db") await Store.upload().catch(() => {});
       location.reload();
     });
@@ -1914,13 +1973,253 @@ function renderSettings() {
     try { await Store.auth.signInWithEmailAndPassword(em, pw); toast("Connecté, je synchronise…"); setTimeout(() => location.reload(), 600); }
     catch (e) { li.disabled = false; li.textContent = "Se connecter"; toast(e.code === "auth/network-request-failed" ? "Pas de connexion internet" : "E-mail ou mot de passe incorrect"); }
   };
+  bindThemes();
   const po = $("#push-on"); if (po) po.onclick = () => enablePush();
   const pt = $("#push-test"); if (pt) pt.onclick = () => { Store.lsSet("pushTest", Date.now() + 30000); syncReminders(); toast("Test programmé : il arrive d'ici 15 min max"); };
   const lo = $("#sy-out"); if (lo) lo.onclick = () => confirmSheet("Se déconnecter ?", "Tes données restent sur ton compte et sur ce téléphone.", "Se déconnecter", async () => { await Store.auth.signOut(); location.reload(); });
 }
 
+/* ------------------------------------------------------------------ EXTRAS : thèmes, carte joueur, réflexes, raquettes */
+function saveExtras() { return Store.set("extras", S.extras).catch(() => toast("Sauvegarde impossible")); }
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const CV = { get line() { return css("--line"); }, get muted() { return css("--muted"); }, get ball() { return css("--ball"); }, get ballSoft() { return "color-mix(in srgb, " + css("--ball") + " 12%, transparent)"; } };
+
+// ---- Thèmes : débloqués en montant au classement (meilleur rang atteint)
+const THEMES = [
+  { id: "classique", name: "Court de nuit", need: null, v: ["#0E2236", "#15314C", "#1D3F5F", "#2C5277", "#EEF3F7", "#9DB2C6", "#F4D13D", "#1A1A10"] },
+  { id: "gazon", name: "Gazon", need: 75000, v: ["#0C2217", "#133222", "#1A422D", "#2A5C41", "#EEF6F0", "#9CBFAA", "#D9F25B", "#15190A"] },
+  { id: "indoor", name: "Indoor", need: 60000, v: ["#0A1B38", "#10284F", "#173566", "#254D8C", "#EEF4FF", "#9FB6DA", "#3DD6F4", "#04202A"] },
+  { id: "sunset", name: "Sunset", need: 45000, v: ["#25111D", "#36192A", "#462237", "#66324F", "#FFF1F4", "#D3A7B8", "#FF8A5B", "#2A0E05"] },
+  { id: "premier", name: "Noir & or", need: 30000, v: ["#0B0B0D", "#151519", "#1F1F25", "#34343D", "#F5F2EA", "#A8A39A", "#D4AF37", "#1A1405"] },
+  { id: "galan", name: "Galán Mode", need: 10000, v: ["#150F29", "#20173C", "#2B204F", "#43336F", "#F4EFFF", "#B3A6D6", "#FF4FA3", "#2A0418"] },
+  { id: "eclair", name: "Éclair", reflex: 250, v: ["#0F1418", "#172027", "#202B34", "#33424F", "#F0F5F8", "#9FB0BD", "#7CFF6B", "#0A1F06"] }
+];
+const THEME_VARS = ["--court", "--court-2", "--court-3", "--line", "--chalk", "--muted", "--ball", "--ball-ink"];
+function bestRank() { const r = (S.comp?.history || []).map(h => h.rank).filter(Boolean); return r.length ? Math.min(...r) : null; }
+function bestReflex() { const r = (S.extras?.reflex || []).filter(x => x.mode === "simple").map(x => x.avg); return r.length ? Math.min(...r) : null; }
+function themeUnlocked(t) {
+  if (t.need) { const b = bestRank(); return b != null && b <= t.need; }
+  if (t.reflex) { const b = bestReflex(); return b != null && b <= t.reflex; }
+  return true;
+}
+function applyTheme(id = S.extras?.theme) {
+  const t = THEMES.find(x => x.id === id) || THEMES[0];
+  THEME_VARS.forEach((k, i) => document.documentElement.style.setProperty(k, t.v[i]));
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t.v[0]);
+}
+function checkUnlocks(silent) {
+  if (!S.extras) return;
+  const now = THEMES.filter(t => (t.need || t.reflex) && themeUnlocked(t)).map(t => t.id);
+  const known = S.extras.unlocked || [];
+  const fresh = now.filter(id => !known.includes(id));
+  if (!fresh.length) return;
+  S.extras.unlocked = [...known, ...fresh]; saveExtras();
+  if (!silent) setTimeout(() => toast("🎨 " + (fresh.length > 1 ? "Thèmes" : "Thème") + " débloqué" + (fresh.length > 1 ? "s" : "") + " : " + fresh.map(id => THEMES.find(t => t.id === id).name).join(", ")), 300);
+}
+function themesHtml() {
+  const b = bestRank(), cur = S.extras?.theme || "classique";
+  const next = THEMES.filter(t => t.need && !themeUnlocked(t)).sort((x, y) => y.need - x.need)[0];
+  return `<h2>Thème</h2>
+    ${next && b ? `<p class="small muted" style="margin:-4px 0 0">Prochain thème (${next.name}) au top ${frNum(next.need)} : encore ${frNum(b - next.need)} places.</p>` : ""}
+    <div class="themes">${THEMES.map(t => { const ok = themeUnlocked(t), v = t.v;
+      return `<button type="button" class="th ${t.id === cur ? "on" : ""} ${ok ? "" : "locked"}" data-th="${t.id}" style="background:${v[1]};color:${v[4]}">
+        <span class="sw4">${[v[0], v[2], v[6], v[5]].map(c => `<span style="background:${c}"></span>`).join("")}</span>
+        <b>${ok ? "" : "🔒 "}${t.name}</b>
+        <small>${t.id === cur ? "Actif" : ok ? "Débloqué" : t.need ? "Top " + frNum(t.need) : "Réflexes ≤ " + t.reflex + " ms"}</small></button>`; }).join("")}</div>`;
+}
+function bindThemes() {
+  app.querySelectorAll("[data-th]").forEach(b => b.onclick = () => {
+    const t = THEMES.find(x => x.id === b.dataset.th);
+    if (!themeUnlocked(t)) { toast(t.need ? `Débloqué quand tu entres dans le top ${frNum(t.need)}` : `Débloqué avec une moyenne de réflexes ≤ ${t.reflex} ms`); return; }
+    S.extras.theme = t.id; applyTheme(t.id); saveExtras(); renderSettings();
+  });
+}
+
+// ---- Carte joueur façon FIFA
+const lerpPts = (v, pts) => { if (v == null) return null; if (v <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (v <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (v - x0) / (x1 - x0); } return pts[pts.length - 1][1]; };
+function testVals(id) { const out = []; for (const [c] of TCOLS) { const v = num(S.tests?.[id]?.[c]); if (v != null) out.push(v); } return out; }
+function bodyWeight() { const w = S.weights || []; return w.length ? w[w.length - 1].kg : testVals("weight").pop() ?? null; }
+const STATS = [
+  ["DÉT", "Détente", () => testVals("jump"), v => lerpPts(v, [[25, 40], [35, 60], [45, 75], [55, 87], [65, 95], [72, 99]]), "test de détente verticale (cm)"],
+  ["VIT", "Vitesse", () => testVals("agility"), v => lerpPts(v, [[4.2, 99], [4.5, 92], [4.9, 80], [5.3, 66], [5.8, 52], [6.4, 40]]), "agilité 5-10-5 (s)"],
+  ["MOB", "Mobilité", () => testVals("spider"), v => lerpPts(v, [[15, 99], [17, 90], [19, 80], [22, 66], [26, 50], [30, 40]]), "spider drill (s)"],
+  ["PUI", "Puissance", () => { const w = bodyWeight(); return w ? testVals("squat5").map(k => k / w) : []; }, v => lerpPts(v, [[.6, 40], [.8, 50], [1, 60], [1.3, 72], [1.6, 84], [2, 95], [2.2, 99]]), "squat × 5 rapporté à ton poids"],
+  ["RÉF", "Réflexes", () => (S.extras?.reflex || []).filter(r => r.mode === "simple").map(r => r.avg).reverse(), v => lerpPts(v, [[200, 99], [225, 92], [250, 82], [280, 72], [320, 60], [380, 45], [450, 40]]), "test de réflexes, mode simple (ms)"],
+  ["RÉG", "Régularité", () => { const from = Date.now() - 28 * DAY; const n = S.logs.filter(l => Date.parse(l.date) >= from).reduce((s, l) => s + (ORDER.includes(l.session) ? 1 : l.session === "M" ? .5 : 0), 0); return [n]; }, v => lerpPts(v, [[0, 40], [4, 60], [8, 78], [12, 92], [14, 99]]), "séances des 4 dernières semaines"]
+];
+function cardStats() {
+  return STATS.map(([k, label, get, map, how]) => { const vals = get(); const v = vals.length ? Math.round(map(vals[vals.length - 1])) : null; const p = vals.length > 1 ? Math.round(map(vals[vals.length - 2])) : null; return { k, label, v, d: v != null && p != null ? v - p : 0, how }; });
+}
+function cardHtml() {
+  const st = cardStats(), got = st.filter(s => s.v != null);
+  const ovr = got.length ? Math.round(got.reduce((s, x) => s + x.v, 0) / got.length) : null;
+  const tier = ovr == null ? "" : ovr >= 85 ? "elite" : ovr >= 75 ? "or" : ovr >= 65 ? "argent" : "";
+  const c = S.extras?.card || {}, b = bestRank(), last = S.comp?.history?.[S.comp.history.length - 1];
+  const ini = (c.name || "Thibaut").trim().slice(0, 1).toUpperCase();
+  return `<button class="pcard ${tier}" id="pcard" type="button" aria-label="Ma carte joueur, toucher pour modifier">
+    <div class="pc-top"><div><div class="pc-ovr num">${ovr ?? "–"}</div><div class="pc-pos">${c.side === "G" ? "REV" : c.side === "D" ? "DRI" : "PAD"}</div><div class="pc-flag">🇫🇷</div></div>
+      <div class="pc-art"><svg viewBox="0 0 92 104" fill="none" stroke="currentColor" stroke-width="3"><ellipse cx="46" cy="38" rx="30" ry="34" fill="currentColor" fill-opacity=".12"/><path d="M38 70l-3 30h22l-3-30" fill="currentColor" fill-opacity=".25"/>${[[36, 22], [46, 22], [56, 22], [31, 34], [41, 34], [51, 34], [61, 34], [36, 46], [46, 46], [56, 46]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.4" fill="currentColor" stroke="none"/>`).join("")}<text x="46" y="64" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-weight="700" font-size="14" fill="currentColor" stroke="none">${esc(ini)}</text></svg></div></div>
+    <div class="pc-name">${esc(c.name || "Thibaut")}</div>
+    <div class="pc-stats">${st.map(s => `<div class="${s.v == null ? "na" : ""}"><b class="num">${s.v ?? "–"}</b>${s.k}${s.d > 0 ? `<i>+${s.d}</i>` : ""}</div>`).join("")}</div>
+    <div class="pc-foot">${last ? "Classé " + frNum(last.rank) + "e" : "Non classé"}${b && last && b < last.rank ? " · record " + frNum(b) + "e" : ""}</div>
+  </button>
+  ${got.length < STATS.length ? `<p class="small muted" style="margin:-2px 0 0;text-align:center">${STATS.length - got.length} stat${STATS.length - got.length > 1 ? "s" : ""} vide${STATS.length - got.length > 1 ? "s" : ""} : remplis les tests ci-dessous pour compléter ta carte.</p>` : ""}
+  <details class="how" style="border:1px solid var(--line);border-radius:var(--r)"><summary>Comment sont calculées les notes</summary><div class="how-body small">
+    <ul>${st.map(s => `<li><b>${s.k}</b> ${s.label} : ${s.how}</li>`).join("")}</ul>
+    <span class="muted">Barèmes maison, notés sur 99, pour suivre ta progression. La note générale est la moyenne des stats remplies. Le « +2 » vert = progression depuis le test précédent. Bronze &lt; 65, argent 65-74, or 75-84, élite 85+.</span></div></details>`;
+}
+function bindCard() {
+  $("#pcard").onclick = () => {
+    const c = S.extras.card || {};
+    openSheet(`<h2>Ma carte</h2>
+      <label class="fld">Nom sur la carte${inp("pc-n", "Thibaut", c.name || "")}</label>
+      <div class="fld">Côté<div class="row" id="pc-s">${[["D", "Droite (drive)"], ["G", "Gauche (revers)"]].map(([k, l]) => `<button type="button" class="chip ${c.side === k ? "ball" : ""}" data-s="${k}" style="border:0;padding:8px 14px">${l}</button>`).join("")}</div></div>`, async () => {
+      S.extras.card = { name: $("#pc-n").value.trim().slice(0, 16), side: $("#pc-s .chip.ball")?.dataset.s || null }; await saveExtras();
+    }, renderTests);
+    $("#pc-s").onclick = e => { const b = e.target.closest("[data-s]"); if (!b) return; const on = !b.classList.contains("ball"); $("#pc-s").querySelectorAll(".chip").forEach(x => x.classList.remove("ball")); if (on) b.classList.add("ball"); };
+  };
+}
+
+// ---- Test de réflexes
+const RX = { n: 5 };
+function reflexHtml() {
+  const list = S.extras?.reflex || [];
+  const best = m => { const r = list.filter(x => x.mode === m); return r.length ? Math.min(...r.map(x => x.avg)) : null; };
+  const last = list.slice(-4).reverse();
+  return `<h2 style="margin-top:8px">Réflexes</h2>
+    <div class="ex" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+      <p class="small muted" style="margin:0">5 essais. Touche l'écran dès que la balle apparaît. En mode gauche/droite, touche le côté de la flèche, comme une volée à choisir au filet.</p>
+      <div class="row"><button class="btn primary" id="rx-s" type="button" style="flex:1">⚡ Simple${best("simple") ? `<small style="display:block;font-weight:500;font-size:12px">record ${best("simple")} ms</small>` : ""}</button>
+        <button class="btn" id="rx-lr" type="button" style="flex:1">↔️ Gauche/Droite${best("lr") ? `<small style="display:block;font-weight:500;font-size:12px">record ${best("lr")} ms</small>` : ""}</button></div>
+      ${last.length ? `<div class="stack" style="gap:4px">${last.map(r => `<div class="row between small"><span>${frDate(r.date)} · ${r.mode === "lr" ? "Gauche/Droite" : "Simple"}</span><span><b>${r.avg} ms</b> <span class="muted">· meilleur ${r.best}${r.early ? " · " + r.early + " faux départ" + (r.early > 1 ? "s" : "") : ""}</span></span></div>`).join("")}</div>` : ""}
+      <p class="small muted" style="margin:0">Le temps inclut la latence de l'écran : compare-toi à toi-même, reposé, toujours avec le même téléphone.</p>
+    </div>`;
+}
+function bindReflex() { $("#rx-s").onclick = () => startRx("simple"); $("#rx-lr").onclick = () => startRx("lr"); }
+function rxShow(cls, info, big, txt, btns = "") {
+  const el = $("#rx"); el.className = "rx on " + cls;
+  $("#rx-info").textContent = info; $("#rx-big").innerHTML = big; $("#rx-big").classList.toggle("arrow", big === "←" || big === "→");
+  $("#rx-txt").innerHTML = txt; $("#rx-btns").innerHTML = btns;
+}
+function startRx(mode) {
+  Object.assign(RX, { mode, times: [], early: 0, miss: 0, state: "ready" });
+  try { RX.lock = navigator.wakeLock?.request("screen"); } catch (e) {}
+  rxShow("", mode === "lr" ? "Gauche / Droite" : "Simple", "🎾", "Touche l'écran pour commencer.<br><span class='muted small'>Attends la balle, puis touche le plus vite possible.</span>", `<button class="btn ghost" data-rx="stop" type="button">Fermer</button>`);
+}
+function rxProgress() { return `Essai ${Math.min(RX.times.length + 1, RX.n)}/${RX.n}`; }
+function rxWait() {
+  RX.state = "wait"; rxShow("", rxProgress(), "…", "Attends…");
+  clearTimeout(RX.h); RX.h = setTimeout(() => {
+    RX.state = "go"; RX.dir = RX.mode === "lr" ? (Math.random() < .5 ? "L" : "R") : null; RX.t0 = performance.now();
+    rxShow("go", rxProgress(), RX.mode === "lr" ? (RX.dir === "L" ? "←" : "→") : "●", RX.mode === "lr" ? "Touche ce côté !" : "Touche !");
+    RX.h = setTimeout(() => { if (RX.state === "go") { RX.state = "show"; rxShow("early", rxProgress(), "😴", "Trop lent, on recommence cet essai.<br><span class='small'>Touche pour continuer.</span>"); } }, 2000);
+  }, 1200 + Math.random() * 2600);
+}
+function rxTap(e) {
+  if (e.target.closest("[data-rx]")) return;
+  e.preventDefault();
+  if (RX.state === "ready" || RX.state === "show") return rxWait();
+  if (RX.state === "wait") { clearTimeout(RX.h); RX.early++; RX.state = "show"; return rxShow("early", rxProgress(), "✋", "Trop tôt ! Attends la balle.<br><span class='small'>Touche pour refaire l'essai.</span>"); }
+  if (RX.state !== "go") return;
+  clearTimeout(RX.h);
+  const ts = e.timeStamp > 1e12 ? performance.now() : e.timeStamp;
+  const dt = Math.round(Math.max(0, ts - RX.t0));
+  if (RX.mode === "lr") { const side = e.clientX < innerWidth / 2 ? "L" : "R"; if (side !== RX.dir) { RX.miss++; RX.state = "show"; return rxShow("early", rxProgress(), "✗", "Mauvais côté !<br><span class='small'>Touche pour refaire l'essai.</span>"); } }
+  RX.times.push(dt);
+  if (RX.times.length >= RX.n) return rxDone();
+  RX.state = "show"; rxShow("", rxProgress().replace(/\d+\//, RX.times.length + "/"), dt + "<span style='font-size:.3em'> ms</span>", "Touche pour l'essai suivant.");
+}
+async function rxDone() {
+  RX.state = "done";
+  const avg = Math.round(RX.times.reduce((a, b) => a + b, 0) / RX.times.length), best = Math.min(...RX.times);
+  const prev = (S.extras.reflex || []).filter(r => r.mode === RX.mode);
+  const rec = prev.length ? Math.min(...prev.map(r => r.avg)) : null;
+  S.extras.reflex = [...(S.extras.reflex || []), { date: isoDate(new Date()), mode: RX.mode, avg, best, early: RX.early, miss: RX.miss, times: RX.times }].slice(-60);
+  await saveExtras();
+  const msg = rec == null ? "Premier test enregistré." : avg < rec ? `🏆 Nouveau record ! (avant : ${rec} ms)` : `Ton record : ${rec} ms`;
+  rxShow("", "Résultat", avg + "<span style='font-size:.3em'> ms</span>", `Moyenne sur 5 · meilleur ${best} ms${RX.early ? ` · ${RX.early} faux départ${RX.early > 1 ? "s" : ""}` : ""}${RX.miss ? ` · ${RX.miss} erreur${RX.miss > 1 ? "s" : ""} de côté` : ""}<br><b>${msg}</b><br><span class="small muted">${RX.times.join(" · ")} ms</span>`,
+    `<button class="btn ghost" data-rx="stop" type="button">Fermer</button><button class="btn primary" data-rx="again" type="button">Recommencer</button>`);
+}
+function stopRx() { clearTimeout(RX.h); RX.state = null; $("#rx").className = "rx"; try { RX.lock?.then?.(l => l.release()); } catch (e) {} if (location.hash === "#tests") renderTests(); checkUnlocks(); }
+$("#rx").addEventListener("pointerdown", rxTap);
+$("#rx").addEventListener("click", e => { const b = e.target.closest("[data-rx]"); if (!b) return; b.dataset.rx === "again" ? startRx(RX.mode) : stopRx(); });
+
+// ---- Raquettothèque
+const GRIP_H = 10, RACKET_H = 200;
+function playedMin(from, to = isoDate(new Date())) {
+  let m = 0;
+  for (let d = from; d <= to; d = plusDays(d, 1)) for (const p of padelOn(d)) m += p.type === "tournoi" ? Math.min(+p.dur || 240, 240) : (+p.dur || 90);
+  return m;
+}
+function racketMin(r, since) {
+  const today = isoDate(new Date());
+  return (r.periods || []).reduce((s, p) => { const a = since && since > p.from ? since : p.from, b = p.to || today; return a <= b ? s + playedMin(a, b) : s; }, 0);
+}
+const hrs = m => Math.round(m / 6) / 10;
+function mainRacket() { return (S.extras?.rackets || []).find(r => r.main); }
+function gripNotice() {
+  const r = mainRacket(); if (!r) return "";
+  const h = hrs(racketMin(r, r.gripAt));
+  return h >= GRIP_H ? `<a class="notice small" href="#competition" style="display:block;text-decoration:none;color:inherit">🎾 Surgrip à changer sur ta ${esc(r.name)} : ${fmt(h)} h de jeu depuis le dernier ›</a>` : "";
+}
+function racketsHtml() {
+  const list = (S.extras?.rackets || []).slice().sort((a, b) => (b.main ? 1 : 0) - (a.main ? 1 : 0) || (b.bought || "").localeCompare(a.bought || ""));
+  const today = parseISO(isoDate(new Date()));
+  return `<div class="row between" style="margin-top:6px"><h2>Raquettes</h2><button class="btn sm" id="rk-add" type="button">+ Raquette</button></div>
+    ${list.map(r => {
+      const tot = hrs(racketMin(r)), g = hrs(racketMin(r, r.gripAt)), months = r.bought ? Math.max(0, Math.round((today - parseISO(r.bought)) / (30.4 * DAY))) : null;
+      const gp = Math.min(100, g / GRIP_H * 100), wear = Math.min(100, tot / RACKET_H * 100);
+      return `<div class="rk ${r.main ? "main" : ""}">
+        <div class="row between"><div><h3>${esc(r.name)}</h3><div class="small muted">${r.bought ? "Achetée le " + frDate(r.bought) + (months != null ? ` · ${months} mois` : "") : "Date d'achat inconnue"}${r.note ? " · " + esc(r.note) : ""}</div></div>
+          <button class="btn sm ghost" data-rk="${r.id}" type="button">Modifier</button></div>
+        <div class="row wrap" style="gap:6px">${r.main ? `<span class="chip ball">Principale</span>` : `<button class="chip" data-rkmain="${r.id}" type="button" style="border:0">Passer en principale</button>`}<span class="chip">${fmt(tot)} h de jeu</span></div>
+        ${r.main ? `<div class="small row between"><span>Surgrip : ${fmt(g)} h${r.gripAt ? " depuis le " + frDate(r.gripAt) : ""}</span><span class="${g >= GRIP_H ? "" : "muted"}" style="${g >= GRIP_H ? "color:var(--warn);font-weight:700" : ""}">${g >= GRIP_H ? "À changer" : "~" + GRIP_H + " h"}</span></div>
+        <div class="meter"><i class="${g >= GRIP_H * .8 ? "warn" : ""}" style="width:${gp}%"></i></div>
+        <button class="btn sm ghost" data-rkgrip="${r.id}" type="button">Surgrip changé aujourd'hui</button>` : ""}
+        <div class="small row between"><span>Usure</span><span class="muted">${tot >= RACKET_H || months >= 12 ? "Elle a bien vécu : à surveiller" : "repère ~" + RACKET_H + " h ou 1 an"}</span></div>
+        <div class="meter"><i class="${wear >= 80 || months >= 12 ? "warn" : ""}" style="width:${wear}%"></i></div>
+      </div>`; }).join("") || `<p class="muted small" style="margin:0">Ajoute ta raquette : l'appli compte tes heures de jeu (matchs et cours du calendrier) et te dit quand changer le surgrip.</p>`}
+    ${list.length ? `<p class="small muted" style="margin:0">Heures calculées depuis ton planning padel, pour la raquette principale. Repères indicatifs : surgrip toutes les ~${GRIP_H} h, une raquette perd de sa vivacité vers ${RACKET_H} h ou un an de jeu régulier.</p>` : ""}`;
+}
+function setMain(id) {
+  const today = isoDate(new Date());
+  for (const r of S.extras.rackets) {
+    const open = (r.periods || []).find(p => !p.to);
+    if (r.id === id) { r.main = true; if (!open) r.periods = [...(r.periods || []), { from: today }]; }
+    else if (r.main || open) { r.main = false; if (open) open.to = open.from >= today ? open.from : plusDays(today, -1); }
+  }
+}
+function racketSheet(r = {}) {
+  openSheet(`<h2>${r.id ? "Modifier la raquette" : "Nouvelle raquette"}</h2>
+    <label class="fld">Modèle${inp("rk-n", "Bullpadel Vertex 04…", r.name || "")}</label>
+    <label class="fld">Date d'achat<input id="rk-d" type="date" value="${r.bought || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    <label class="fld">Dernier changement de surgrip<input id="rk-g" type="date" value="${r.gripAt || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    <label class="fld">Note <span class="small muted" style="font-weight:400">(facultatif)</span>${inp("rk-o", "Poids, prix, ressenti…", r.note || "")}</label>
+    ${r.id ? "" : `<label class="toggle" style="padding:10px 14px"><span><b>Raquette principale</b><span class="small muted" style="display:block">Les heures de jeu comptent depuis la date d'achat</span></span><input id="rk-m" type="checkbox" ${(S.extras.rackets || []).some(x => x.main) ? "" : "checked"} style="width:24px;height:24px"></label>`}
+    ${r.id ? `<button class="btn sm danger" id="rk-del" type="button">Supprimer cette raquette</button>` : ""}`, async () => {
+    const name = $("#rk-n").value.trim(); if (!name) { toast("Donne un nom à ta raquette"); return false; }
+    const bought = $("#rk-d").value || null;
+    S.extras.rackets = S.extras.rackets || [];
+    if (r.id) { const x = S.extras.rackets.find(y => y.id === r.id); Object.assign(x, { name, bought, note: $("#rk-o").value.trim(), gripAt: $("#rk-g").value || x.gripAt }); if (x.periods?.[0] && bought && x.periods.length === 1 && x.periods[0].from === r.bought) x.periods[0].from = bought; }
+    else {
+      const x = { id: "rk" + Date.now(), name, bought, note: $("#rk-o").value.trim(), main: false, periods: [], gripAt: $("#rk-g").value || isoDate(new Date()) };
+      S.extras.rackets.push(x);
+      if ($("#rk-m").checked) { setMain(x.id); const p = x.periods.find(p => !p.to); if (p && bought) p.from = bought; }
+    }
+    await saveExtras(); toast("Raquette enregistrée");
+  });
+  const del = $("#rk-del"); if (del) del.onclick = () => confirmSheet("Supprimer cette raquette ?", "Ses heures de jeu seront perdues.", "Supprimer", async () => { S.extras.rackets = S.extras.rackets.filter(x => x.id !== r.id); await saveExtras(); renderComp(); });
+}
+function bindRackets() {
+  $("#rk-add").onclick = () => racketSheet();
+  app.querySelectorAll("[data-rk]").forEach(b => b.onclick = () => racketSheet(S.extras.rackets.find(x => x.id === b.dataset.rk)));
+  app.querySelectorAll("[data-rkmain]").forEach(b => b.onclick = async () => { setMain(b.dataset.rkmain); await saveExtras(); toast("Raquette principale changée"); renderComp(); });
+  app.querySelectorAll("[data-rkgrip]").forEach(b => b.onclick = async () => { S.extras.rackets.find(x => x.id === b.dataset.rkgrip).gripAt = isoDate(new Date()); await saveExtras(); toast("Surgrip noté, compteur remis à zéro"); renderComp(); });
+}
+
 window.addEventListener("hashchange", route);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && T.h) tick(); });
+try { applyTheme((JSON.parse(localStorage.getItem("padelapp2:extras")) || {}).theme); } catch (e) {}
 (async function boot() {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   await Store.init();
@@ -1944,9 +2243,11 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && T.
     S.padel = (await Store.get("padel")) || [];
     S.weights = (await Store.get("weights")) || [];
     S.journal = (await Store.get("journal")) || [];
+    S.extras = (await Store.get("extras")) || {};
     S.comp = (await Store.get("comp")) || seedComp(); if (!(await Store.get("comp"))) Store.set("comp", S.comp);
     S.settings = settings; S.current = current; S.tests = tests || {}; S.logs = logs || [];
   } catch (e) { if (Store.mode === "db") S.loadError = true; }
+  S.extras = S.extras || {}; applyTheme(); checkUnlocks(true);
   route();
 })();
 </script>
