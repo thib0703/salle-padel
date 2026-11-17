@@ -631,7 +631,7 @@ const FB_CONFIG = {
   appId: "1:564623606130:web:463f4d42b7e3748f2a5deb"
 };
 const VAPID_KEY = "BFakDRVHscjbCVzMvzc2N-p96sATx-RXyKwPLaAnA8uVzqfLS5e4jKVsFJDto_JNuZhhhdU85V2hi0QSICbxJK0";
-const SYNC_KEYS = ["settings", "current", "tests", "padel", "comp", "weights", "journal", "extras"];
+const SYNC_KEYS = ["settings", "current", "tests", "padel", "comp", "weights", "journal", "extras", "health"];
 // Synchro Firebase (projet « les-mimichats », même compte que l'appli de couple).
 // Firestore refuse les tableaux imbriqués : chaque valeur est stockée en texte JSON.
 // localStorage reste toujours à jour : l'appli marche hors ligne et sans compte.
@@ -972,6 +972,7 @@ function renderHome() {
       ${weekBar(wi)}
       ${chips.length ? `<div class="row wrap" style="margin-top:12px">${chips.join("")}</div>` : ""}
     </section>
+    ${healthHtml()}
     ${PW.html}
     ${(() => { const today = padelOn(P.todayIso); const m = today.find(p => p.type === "match" || p.type === "tournoi");
       return `<div class="row"><button class="btn ${m ? "primary" : "ghost"}" id="prematch" type="button" style="flex:1">🔥 Avant-match<small style="display:block;font-weight:500;font-size:12px">8 min</small></button><button class="btn ghost" id="postmatch" type="button" style="flex:1">🧘 Récup après<small style="display:block;font-weight:500;font-size:12px">8 min</small></button></div>`; })()}
@@ -989,7 +990,7 @@ function renderHome() {
     ${recent ? `<div class="stack" style="gap:6px"><h3>Dernières séances</h3>${recent}</div>` : ""}
     <p class="sync">${Store.mode === "db" ? "Synchronisé sur ton compte, sur tous tes appareils." : "Sauvegarde sur cet appareil uniquement."}</p>
   </div>`;
-  syncReminders();
+  syncReminders(); bindHealth();
   $("#pad-add").onclick = () => padelSheet();
   $("#prematch").onclick = () => startGuided(PREMATCH, "Échauffé, bon match !");
   $("#postmatch").onclick = () => startGuided(POSTMATCH, "Récup terminée. Pense à noter ton match !");
@@ -1544,6 +1545,31 @@ function buildReminders() {
   // Séance maison : jeudi 18 h 30 si l'objectif de la semaine n'est pas atteint
   const thu = plusDays(isoDate(mondayOf(new Date())), 3);
   if (homeThisWeek() < HOME_TARGET) add(`home-${thu}`, at(thu, "18:30"), "Séance M ce soir ?", `${homeThisWeek()}/${HOME_TARGET} cette semaine. 20 min à la maison pour tes appuis.`, "./#seance-m");
+  // Hydratation : toutes les X h dans la plage choisie ; aujourd'hui, plus rien une fois l'objectif atteint
+  const h = H(), gym = gymDaySet();
+  if (h.hydra) {
+    const [fh, fm] = h.hFrom.split(":").map(Number), [th, tm] = h.hTo.split(":").map(Number);
+    const step = Math.round((+h.hEvery || 2) * 60), MSG = ["Un grand verre d'eau 💧", "Petite pause eau 💧", "Pense à ta gourde 💧", "Hydrate tes muscles 💧"];
+    for (let i = 0; i <= 8; i++) {
+      const d = plusDays(today, i), g = waterGoalFor(d, gym), k = dayKind(d, gym);
+      if (i === 0 && waterOf(d) >= g) continue;
+      const extra = k === "tournoi" ? " (jour de tournoi)" : k === "actif" ? " (jour d'entraînement)" : "";
+      for (let m = fh * 60 + fm, n = 0; m <= th * 60 + tm; m += step, n++) {
+        const hm = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+        add(`eau-${d}-${hm}`, at(d, hm), MSG[n % MSG.length], `Objectif du jour : ${litres(g)}${extra}. Note tes verres dans l'appli.`, "./#accueil");
+      }
+    }
+  }
+  // Étirements & motricité : après le padel, et les soirs sans salle ni padel (cette semaine)
+  if (h.stretch) {
+    const sun = plusDays(isoDate(mondayOf(new Date())), 6);
+    for (let i = 0; i <= 8; i++) {
+      const d = plusDays(today, i), pad = padelOn(d);
+      for (const p of pad) if (p.type !== "tournoi" && p.time) add(`etir-${d}-${p.id}`, at(d, p.time) + ((+p.dur || 90) + 20) * 60000, "Étirements après le padel 🧘", "8 min de récup guidée : bouton « Récup après » dans l'appli.", "./#accueil");
+      if (d > sun || pad.length || gym.has(d) || homeOn(d) || out.some(x => x.id === `home-${d}`)) continue;
+      add(`mob-${d}`, at(d, "20:30"), "Motricité ou étirements ce soir ? 🤸", homeThisWeek() < HOME_TARGET ? `Séance M (20 min) : ${homeThisWeek()}/${HOME_TARGET} cette semaine.` : "10 min d'étirements suffisent pour récupérer.", "./#seance-m");
+    }
+  }
   // Rappel de test (bouton dans Réglages) : gardé 20 min pour que la fonction le voie
   const tst = Store.lsGet("pushTest"); if (tst && tst > now - 20 * 60000) out.push({ id: "test-" + tst, at: tst, title: "Test Salle Padel 🎾", body: "Les rappels marchent !", url: "./#reglages" });
   return out.sort((a, b) => a.at - b.at);
@@ -1571,6 +1597,162 @@ async function enablePush() {
     await pushRef().doc("dev-" + id).set({ token, at: Date.now(), ua: navigator.userAgent.slice(0, 120) });
     Store.lsSet("pushOn", true); Store.lsSet("pushSig", null); syncReminders(); toast("Rappels activés"); renderSettings();
   } catch (e) { toast("Activation impossible : " + (e.code || e.message || "erreur")); }
+}
+
+/* ------------------------------------------------------------------ PAS & HYDRATATION */
+// Pas : un raccourci iPhone (Santé) les envoie à la fonction « pasSallePadel », qui les range dans data/steps.
+// Eau : verres de 25 cl notés dans l'appli. Objectifs plus hauts les jours d'entraînement.
+const STEPS_FN = "https://europe-west9-les-mimichats.cloudfunctions.net/pasSallePadel";
+const SHORTCUT_NAME = "Pas Salle Padel";
+const HDEF = { stepGoal: 8000, restBonus: 2000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true };
+const H = () => ({ ...HDEF, ...(S.health || {}) });
+function saveHealth() { return Store.set("health", S.health).catch(() => toast("Sauvegarde impossible")); }
+// Jours de salle (faits ou prévus cette semaine), calculés une fois
+function gymDaySet() {
+  const set = new Set(S.logs.filter(l => ORDER.includes(l.session)).map(l => isoDate(new Date(l.date))));
+  try { const wi = weekInfo(); if (wi && !wi.over) Object.keys(planWeek(wi).plan).forEach(d => set.add(d)); } catch (e) {}
+  return set;
+}
+function dayKind(iso, gym = gymDaySet()) {
+  const pad = padelOn(iso);
+  if (pad.some(p => p.type === "tournoi")) return "tournoi";
+  return gym.has(iso) || pad.length ? "actif" : "repos";
+}
+function stepGoalFor(iso, gym) { const h = H(); return h.stepGoal + (dayKind(iso, gym) === "repos" ? h.restBonus : 0); }
+function waterGoalFor(iso, gym) { const k = dayKind(iso, gym); return Math.round(H().waterL * 4) + (k === "tournoi" ? 4 : k === "actif" ? 2 : 0); }
+const litres = g => (g / 4).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " L";
+const stepsOf = iso => (S.steps || {})[iso];
+const waterOf = iso => (S.health?.water || {})[iso] || 0;
+function stepStreak(gym) {
+  let n = 0, d = isoDate(new Date());
+  if (!(stepsOf(d) >= stepGoalFor(d, gym))) d = plusDays(d, -1); // aujourd'hui pas encore fini : on part d'hier
+  while (stepsOf(d) >= stepGoalFor(d, gym)) { n++; d = plusDays(d, -1); }
+  return n;
+}
+async function refreshSteps() {
+  if (Store.mode !== "db") return false;
+  const before = JSON.stringify(S.steps || {});
+  S.steps = (await Store.get("steps")) || {};
+  return JSON.stringify(S.steps) !== before;
+}
+async function addWater(delta) {
+  const iso = isoDate(new Date());
+  S.health = S.health || {}; S.health.water = { ...(S.health.water || {}) };
+  S.health.water[iso] = Math.max(0, waterOf(iso) + delta);
+  // On ne garde que 120 jours
+  for (const k of Object.keys(S.health.water).sort().slice(0, -120)) delete S.health.water[k];
+  await saveHealth(); syncReminders();
+}
+function ring(p, size = 64, col = "var(--ball)") {
+  const r = size / 2 - 5, c = 2 * Math.PI * r, f = Math.min(1, Math.max(0, p));
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true" style="flex:none"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--court-3)" stroke-width="7"/>${f > 0 ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c * f} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ""}</svg>`;
+}
+function healthHtml() {
+  const iso = isoDate(new Date()), gym = gymDaySet(), kind = dayKind(iso, gym);
+  const sg = stepGoalFor(iso, gym), st = stepsOf(iso), wg = waterGoalFor(iso, gym), w = waterOf(iso), streak = stepStreak(gym);
+  const upd = S.steps?._at ? new Date(S.steps._at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+  const configured = !!(S.steps && Object.keys(S.steps).some(k => !k.startsWith("_")));
+  const kindTxt = kind === "tournoi" ? "jour de tournoi" : kind === "actif" ? "jour d'entraînement" : "jour de repos";
+  return `<div class="row" style="gap:10px;align-items:stretch">
+    <button class="ex" id="h-steps" type="button" style="flex:1;min-width:0;padding:10px;display:flex;gap:8px;align-items:center;text-align:left;color:inherit;font:inherit">
+      <span style="position:relative;display:grid;place-items:center">${ring(st ? st / sg : 0, 54, st >= sg ? "var(--good)" : "var(--ball)")}<span style="position:absolute;font-size:18px">👟</span></span>
+      <span style="min-width:0"><b class="num" style="font-size:20px">${st != null ? frNum(st) : "–"}</b><span class="small muted" style="display:block">/ ${frNum(sg)} pas${streak > 1 ? ` · 🔥 ${streak} j` : ""}</span><span class="small muted" style="display:block;font-size:11.5px">${configured ? (upd ? "maj " + upd : "") : "Raccourci à installer ›"}</span></span>
+    </button>
+    <div class="ex" style="flex:1;min-width:0;padding:10px;display:flex;gap:8px;align-items:center">
+      <span style="position:relative;display:grid;place-items:center">${ring(w / wg, 54, w >= wg ? "var(--good)" : "#5BB8F4")}<span style="position:absolute;font-size:18px">💧</span></span>
+      <span style="min-width:0;flex:1"><b class="num" style="font-size:20px">${litres(w)}</b><span class="small muted" style="display:block">/ ${litres(wg)}</span>
+        <span class="row" style="gap:6px;margin-top:6px;flex-wrap:nowrap"><button class="btn sm ghost" id="h-wm" type="button" aria-label="Retirer un verre" style="padding:6px 0;flex:1">−</button><button class="btn sm primary" id="h-wp" type="button" aria-label="Ajouter un verre" style="padding:6px 0;flex:2;white-space:nowrap">+1 💧</button></span></span>
+    </div></div>
+    <p class="small muted" style="margin:-4px 0 0">Objectifs du ${kindTxt}. Un verre = 25 cl.</p>`;
+}
+function bindHealth() {
+  const p = $("#h-wp"), m = $("#h-wm"), s = $("#h-steps");
+  if (p) p.onclick = async () => { await addWater(1); const iso = isoDate(new Date()); if (waterOf(iso) === waterGoalFor(iso)) toast("Objectif d'eau atteint 💧 Plus de rappels aujourd'hui"); renderHome(); };
+  if (m) m.onclick = async () => { if (!waterOf(isoDate(new Date()))) return; await addWater(-1); renderHome(); };
+  if (s) s.onclick = () => healthSheet();
+}
+function healthSheet() {
+  const gym = gymDaySet(), today = isoDate(new Date());
+  const days = Array.from({ length: 14 }, (_, i) => plusDays(today, i - 13));
+  const max = Math.max(...days.map(d => Math.max(stepsOf(d) || 0, stepGoalFor(d, gym))));
+  const bars = days.map(d => { const v = stepsOf(d) || 0, g = stepGoalFor(d, gym);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="height:110px;width:100%;display:flex;align-items:flex-end;position:relative"><div style="position:absolute;left:0;right:0;bottom:${g / max * 100}%;border-top:1px dashed var(--muted);opacity:.5"></div><div style="width:100%;height:${v / max * 100}%;background:${v >= g ? "var(--good)" : "var(--ball)"};border-radius:4px 4px 0 0;opacity:${v ? 1 : .2}"></div></div><span style="font-size:10px;color:var(--muted)">${parseISO(d).getDate()}</span></div>`; }).join("");
+  const done = days.filter(d => stepsOf(d) >= stepGoalFor(d, gym)).length;
+  const avg = Math.round(days.filter(d => stepsOf(d) != null).reduce((s, d) => s + stepsOf(d), 0) / Math.max(1, days.filter(d => stepsOf(d) != null).length));
+  const wDays = days.filter(d => waterOf(d) >= waterGoalFor(d, gym)).length;
+  $("#sheet").innerHTML = `<h2>Pas & hydratation · 14 jours</h2>
+    <div style="display:flex;gap:3px">${bars}</div>
+    <p class="small" style="margin:0">Objectif de pas atteint <b>${done} jour${done > 1 ? "s" : ""} sur 14</b> · moyenne <b>${frNum(avg)}</b> pas. Objectif d'eau atteint <b>${wDays} jour${wDays > 1 ? "s" : ""}</b>. La ligne pointillée est l'objectif du jour (+${frNum(H().restBonus)} pas les jours de repos).</p>
+    <a class="btn block" href="shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}">↻ Mettre à jour mes pas maintenant</a>
+    <span class="small muted">Lance le raccourci, puis reviens dans l'appli : le compteur se met à jour tout seul.</span>
+    <button class="btn ghost block" id="h-cfg" type="button">Objectifs et installation du raccourci ›</button>
+    <button class="btn ghost block" id="m-no" type="button">Fermer</button>`;
+  $("#modal").classList.add("on");
+  const close = () => $("#modal").classList.remove("on");
+  $("#m-no").onclick = close; $("#modal").onclick = e => { if (e.target.id === "modal") close(); };
+  $("#h-cfg").onclick = () => { close(); location.hash = "#reglages"; setTimeout(() => $("#health-set")?.scrollIntoView({ block: "start" }), 50); };
+}
+function stepsKey() {
+  let k = Store.lsGet("pasKey");
+  if (!k) { const a = new Uint8Array(18); crypto.getRandomValues(a); k = Array.from(a, b => b.toString(16).padStart(2, "0")).join(""); Store.lsSet("pasKey", k); }
+  return k;
+}
+async function ensureStepsKey() {
+  if (Store.mode !== "db") return null;
+  const ref = pushRef().doc("cles");
+  try { const s = await Store.withTimeout(ref.get()); const cur = s.exists && s.get("pas"); if (cur) { Store.lsSet("pasKey", cur); return cur; } } catch (e) {}
+  const k = stepsKey(); await ref.set({ pas: k }, { merge: true }).catch(() => {}); return k;
+}
+function healthSettingsHtml() {
+  const h = H();
+  const tog = (id, on, label, sub) => `<div class="toggle"><div><b>${label}</b><div class="small muted">${sub}</div></div><button class="sw" id="${id}" role="switch" aria-checked="${on}" aria-label="${label}"></button></div>`;
+  return `<h2 style="margin-top:12px" id="health-set">Pas & hydratation</h2>
+    <div class="row"><label class="fld" style="flex:1">Objectif de pas${inp("hs-sg", "8000", h.stepGoal, "numeric")}</label><label class="fld" style="flex:1">+ jours de repos${inp("hs-rb", "2000", h.restBonus, "numeric")}</label></div>
+    <label class="fld">Eau par jour (litres, hors entraînement)${inp("hs-w", "2,5", String(h.waterL).replace(".", ","), "decimal")}</label>
+    <p class="small muted" style="margin:-4px 0 0">Jour de salle ou de padel : +0,5 L. Jour de tournoi : +1 L.</p>
+    ${tog("hs-hy", h.hydra, "Rappels pour boire", "Ils s'arrêtent dès que l'objectif du jour est atteint")}
+    <div class="row"><label class="fld" style="flex:1">De<input id="hs-f" type="time" value="${h.hFrom}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label><label class="fld" style="flex:1">À<input id="hs-t" type="time" value="${h.hTo}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+      <label class="fld" style="flex:1">Toutes les<select id="hs-e">${[1, 1.5, 2, 3].map(x => `<option value="${x}" ${+h.hEvery === x ? "selected" : ""}>${String(x).replace(".", ",")} h</option>`).join("")}</select></label></div>
+    ${tog("hs-st", h.stretch, "Rappels étirements & motricité", "Après le padel, et les soirs sans salle ni padel")}
+    <button class="btn primary block" id="hs-save" type="button">Enregistrer</button>
+    <details class="how" style="border:1px solid var(--line);border-radius:var(--r)"><summary>Installer le raccourci des pas (une seule fois)</summary><div class="how-body" id="hs-sc">
+      ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro (plus haut).</p>` : `<p class="small muted" style="margin:0">Chargement…</p>`}</div></details>`;
+}
+function shortcutHelp(url) {
+  return `<p class="small" style="margin:0"><b>1. Le raccourci</b> · App <b>Raccourcis</b> → onglet Raccourcis → <b>+</b>. Nomme-le exactement <b>${SHORTCUT_NAME}</b>, puis ajoute ces actions :</p>
+    <ol class="small" style="margin:0;padding-left:20px;display:grid;gap:6px">
+      <li><b>Rechercher des échantillons de santé</b> : Type <b>Nombre de pas</b>, ajoute le filtre <b>Date de début</b> <b>est aujourd'hui</b>, et règle <b>Regrouper par : Jour</b>.</li>
+      <li><b>Calculer des statistiques</b> : <b>Somme</b> de Échantillons de santé.</li>
+      <li><b>Texte</b> : colle le lien ci-dessous, puis ajoute juste après la variable <b>Statistiques</b> (touche « Statistiques » au-dessus du clavier).</li>
+      <li><b>Obtenir le contenu de l'URL</b> : URL = <b>Texte</b>.</li>
+    </ol>
+    <div style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12.5px;word-break:break-all">${esc(url)}</div>
+    <button class="btn sm" id="hs-copy" type="button">Copier le lien</button>
+    <p class="small" style="margin:0">Lance-le une fois : il doit afficher « OK : … pas ». Autorise l'accès à Santé quand il le demande.</p>
+    <p class="small" style="margin:0"><b>2. L'automatisation</b> · Onglet <b>Automatisation</b> → <b>+</b> → <b>Heure de la journée</b> → 12:30, <b>Quotidien</b>, coche <b>Exécuter immédiatement</b> → action <b>Exécuter le raccourci</b> : ${SHORTCUT_NAME}. Refais-en deux autres à <b>18:30</b> et <b>22:30</b> pour un compteur à jour dans la journée.</p>
+    <p class="small muted" style="margin:0">Si le total diffère de l'app Santé (montre + iPhone qui comptent en double), dis-le-moi.</p>
+    <p class="small" style="margin:0"><b>3. La fonction Firebase</b> (à faire une fois, comme pour les rappels) · Sur un ordi, ouvre <b>shell.cloud.google.com</b> et colle :</p>
+    <div style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12.5px;word-break:break-all">bash &lt;(curl -s https://raw.githubusercontent.com/thib0703/salle-padel/main/i)</div>`;
+}
+function bindHealthSettings() {
+  const sw = id => { const b = $("#" + id); if (b) b.onclick = () => b.setAttribute("aria-checked", b.getAttribute("aria-checked") !== "true"); };
+  sw("hs-hy"); sw("hs-st");
+  $("#hs-save").onclick = async () => {
+    const sg = num($("#hs-sg").value), rb = num($("#hs-rb").value), w = num($("#hs-w").value);
+    if (!sg || sg < 1000 || sg > 40000) { toast("Objectif de pas entre 1 000 et 40 000"); return; }
+    if (!w || w < 1 || w > 6) { toast("Eau : entre 1 et 6 litres"); return; }
+    const f = $("#hs-f").value || HDEF.hFrom, t = $("#hs-t").value || HDEF.hTo;
+    if (t <= f) { toast("L'heure de fin doit être après le début"); return; }
+    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true" };
+    await saveHealth(); syncReminders(); toast("Réglages enregistrés");
+  };
+  const box = $("#hs-sc"); if (!box || Store.mode !== "db") return;
+  ensureStepsKey().then(k => {
+    if (!k) { box.innerHTML = `<p class="small muted" style="margin:0">Impossible de créer ta clé (réseau ?). Rouvre la page.</p>`; return; }
+    const url = `${STEPS_FN}?k=${k}&pas=`;
+    box.innerHTML = shortcutHelp(url);
+    $("#hs-copy").onclick = () => copyText(url, "Lien");
+  });
 }
 
 /* ------------------------------------------------------------------ BILAN DU MOIS */
@@ -1835,7 +2017,7 @@ function renderComp() {
   $("#c-addpa").onclick = () => partnerSheet();
   app.querySelectorAll("[data-pa]").forEach(b => b.onclick = () => partnerSheet(c.partners.find(x => x.id === b.dataset.pa)));
   app.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b.dataset.copy, "Numéro de licence"));
-  app.querySelectorAll("[data-res]").forEach(b => b.onclick = () => { const t = c.upcoming.find(x => x.id === b.dataset.res); resultSheet({ ...t, fromUpcoming: true }); });
+  app.querySelectorAll("[data-res]").forEach(b => b.onclick = () => { const t = c.upcoming.find(x => x.id === b.dataset.res); if (t.date > isoDate(new Date())) tourSheet(t); else resultSheet({ ...t, fromUpcoming: true }); });
   app.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => resultSheet(c.results.find(x => x.id === b.dataset.edit)));
   app.querySelectorAll("[data-delr]").forEach(b => b.onclick = () => confirmSheet("Supprimer ce résultat ?", "Il ne comptera plus dans le simulateur.", "Supprimer", async () => { c.results = c.results.filter(x => x.id !== b.dataset.delr); await saveComp(); renderComp(); }));
   $("#cuts-save").onclick = async () => {
@@ -1886,11 +2068,56 @@ function tourSheet(t = {}) {
     <label class="fld">Date<input id="t-d" type="date" value="${t.date || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
     <label class="fld">Catégorie<select id="t-c">${CATS.map(k => `<option ${k === (t.cat || "P25") ? "selected" : ""}>${k}</option>`).join("")}</select></label>
     <label class="fld">Nom / club${inp("t-n", "ex. P25 Corbas", t.name || "")}</label>
-    <label class="fld">Partenaire${inp("t-p", "ex. Lucas Gutierrez", t.partner || "").replace("<input", '<input list="plist"')}</label>${partnerList()}`, async () => {
+    <label class="fld">Partenaire${inp("t-p", "ex. Lucas Gutierrez", t.partner || "").replace("<input", '<input list="plist"')}</label>${partnerList()}
+    <p class="small muted" style="margin:0">Il s'ajoute aussi à l'agenda des mimichats.</p>
+    ${t.id ? `<button class="btn sm danger" id="t-del" type="button" style="align-self:flex-start">Supprimer ce tournoi</button>` : ""}`, async () => {
     const c = S.comp; const d = $("#t-d").value; if (!d) { toast("Choisis une date"); return false; }
-    const item = { id: t.id || "u" + Date.now(), date: d, cat: $("#t-c").value, name: $("#t-n").value.trim(), partner: $("#t-p").value.trim() };
-    c.upcoming = (c.upcoming || []).filter(x => x.id !== item.id); c.upcoming.push(item); await saveComp(); toast("Tournoi ajouté");
+    const item = { ...t, id: t.id || "u" + Date.now(), date: d, cat: $("#t-c").value, name: $("#t-n").value.trim(), partner: $("#t-p").value.trim() };
+    c.upcoming = (c.upcoming || []).filter(x => x.id !== item.id); c.upcoming.push(item); await saveComp(); toast(t.id ? "Tournoi modifié" : "Tournoi ajouté");
+    pushTournament(item);
   });
+  const del = $("#t-del"); if (del) del.onclick = () => confirmSheet("Supprimer ce tournoi ?", "Il disparaît aussi de l'agenda des mimichats.", "Supprimer", async () => {
+    S.comp.upcoming = S.comp.upcoming.filter(x => x.id !== t.id); await saveComp(); removeTournament(t); renderComp();
+  });
+}
+/* ---- Tournois partagés avec l'agenda des mimichats (foyer/main/events, champ « padel » = catégorie) */
+const evCol = () => Store.db.collection("foyer").doc("main").collection("events");
+const tourTitle = t => "🎾 " + t.cat + (t.name && t.name !== t.cat ? " · " + t.name : "");
+function pushTournament(t, extra = {}) {
+  if (Store.mode !== "db") return Promise.resolve();
+  const id = t.evId || "sp-" + t.id;
+  return evCol().doc(id).set({ title: tourTitle(t), date: t.date, endDate: "", time: t.time || "", endTime: "", allDay: !t.time, who: "thib", recur: "none", remind: "none",
+    padel: t.cat, padelName: t.name || "", partner: t.partner || "", padelId: t.id, by: "thib", at: Date.now(), ...extra }, { merge: true })
+    .then(() => { if (!t.evId) { t.evId = id; saveComp(); } }) // lien noté seulement une fois l'événement créé
+    .catch(() => toast("Agenda des mimichats non mis à jour (réseau ?)"));
+}
+function removeTournament(t) { if (Store.mode === "db" && t.evId) evCol().doc(t.evId).delete().catch(() => {}); }
+let pulling = false;
+async function pullTournaments() {
+  if (Store.mode !== "db" || !S.comp || pulling) return;
+  pulling = true;
+  try {
+    const snap = await Store.withTimeout(evCol().get({ source: "server" }), 8000);
+    const c = S.comp, today = isoDate(new Date()); c.upcoming = c.upcoming || []; let changed = false;
+    const evs = new Map(snap.docs.filter(d => d.get("padel")).map(d => [d.id, d.data()]));
+    const known = new Set([...c.upcoming, ...c.results].map(x => x.evId).filter(Boolean));
+    for (const [id, e] of evs) {
+      if (e.padelDone) continue;
+      const name = e.padelName != null && e.title === tourTitle({ cat: e.padel, name: e.padelName }) ? e.padelName
+        : String(e.title || "").replace(/^🎾\s*/, "").replace(new RegExp("^" + e.padel + "\\s*·?\\s*"), "").trim();
+      const u = c.upcoming.find(x => x.evId === id);
+      if (!u) { if (!known.has(id) && e.date >= plusDays(today, -3)) { c.upcoming.push({ id: "m" + Date.now() + Math.random().toString(36).slice(2, 5), evId: id, date: e.date, time: e.time || "", cat: e.padel, name, partner: e.partner || "" }); changed = true; } continue; }
+      const upd = { date: e.date, time: e.time || "", cat: e.padel, name, partner: e.partner ?? u.partner };
+      if (Object.keys(upd).some(k => (u[k] || "") !== (upd[k] || ""))) { Object.assign(u, upd); changed = true; }
+    }
+    // Supprimés dans les mimichats (ou qui ne sont plus des tournois)
+    const before = c.upcoming.length;
+    c.upcoming = c.upcoming.filter(x => !x.evId || evs.has(x.evId));
+    if (c.upcoming.length !== before) changed = true;
+    // Tournois notés avant la synchro : envoyés à l'agenda
+    for (const u of c.upcoming.filter(x => !x.evId && x.date >= today)) { pushTournament(u); changed = true; }
+    if (changed) { await saveComp(); const h = (location.hash || "#accueil").slice(1); if (!$("#modal").classList.contains("on") && (h === "competition" || h === "accueil")) route(); }
+  } catch (e) {} finally { pulling = false; }
 }
 function resultSheet(r = {}) {
   openSheet(`<h2>${r.id && !r.fromUpcoming ? "Modifier le résultat" : "Résultat du tournoi"}</h2>
@@ -1906,8 +2133,9 @@ function resultSheet(r = {}) {
     const item = { id: r.fromUpcoming || !r.id ? "r" + Date.now() : r.id, date: $("#r-d").value, cat: $("#r-c").value, pairs: +$("#r-n").value || null, place: +$("#r-pl").value || null, pts,
       name: $("#r-nm").value.trim() || $("#r-c").value, partner: $("#r-pa").value.trim(), matches: $("#r-m").value.trim().toUpperCase(), estimated: true };
     c.results = c.results.filter(x => x.id !== item.id); c.results.push(item);
-    if (r.fromUpcoming) c.upcoming = c.upcoming.filter(x => x.id !== r.id);
+    if (r.fromUpcoming) { c.upcoming = c.upcoming.filter(x => x.id !== r.id); if (r.evId) item.evId = r.evId; }
     await saveComp(); toast("Résultat enregistré");
+    if (item.evId) pushTournament(item, { title: tourTitle(item) + ` : ${item.place ? item.place + "e" : "résultat"} (+${item.pts} pts)`, padelDone: true });
   });
   const hint = () => { const p = baremePts($("#r-c").value, +$("#r-pl").value, +$("#r-n").value); $("#r-hint").textContent = p != null ? "· barème : " + p : ""; if (p != null && !$("#r-pts").dataset.touched) $("#r-pts").value = p; };
   ["#r-c", "#r-n", "#r-pl"].forEach(s => $(s).oninput = hint); $("#r-pts").oninput = () => { $("#r-pts").dataset.touched = 1; };
@@ -1946,8 +2174,9 @@ function renderSettings() {
     ${syncHtml()}
     <h2 style="margin-top:12px">Rappels</h2>
     ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro ci-dessus : les rappels passent par ton compte.</p>`
-      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li></ul></div><button class="btn primary block" id="push-test" type="button">Envoyer une notification de test</button><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
+      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li>${H().hydra ? "<li>de quoi boire, toutes les " + String(H().hEvery).replace(".", ",") + " h de " + H().hFrom.replace(":", "h") + " à " + H().hTo.replace(":", "h") + "</li>" : ""}${H().stretch ? "<li>étirements après le padel, motricité les soirs libres</li>" : ""}</ul></div><button class="btn primary block" id="push-test" type="button">Envoyer une notification de test</button><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
       : `<p class="small muted" style="margin:0">Séance du lendemain, échauffement avant un match, pesée du lundi, match à noter… L'appli doit être ouverte depuis son icône sur l'écran d'accueil.</p><button class="btn primary block" id="push-on" type="button">Activer les rappels</button>`}
+    ${healthSettingsHtml()}
     <h2 style="margin-top:12px">Nouveau cycle</h2>
     <p class="small muted" style="margin:0">Tu es au cycle ${cycleNo()}. Repars en semaine 1 aujourd'hui : un cycle sur deux, quelques exercices changent. Historique et charges conservés.</p>
     <button class="btn ghost block" id="set-restart" type="button">Lancer le cycle ${cycleNo() + 1}</button>
@@ -1961,7 +2190,7 @@ function renderSettings() {
     <p class="sync">${Store.mode === "db" ? "Sauvegardé sur ton compte, sur tous tes appareils." : "Données sur cet appareil uniquement."}</p>
   </div>`;
   $("#bk-copy").onclick = async () => {
-    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: S.logs.map(({ _id, ...l }) => ({ ...l, _id })), current: S.current, comp: S.comp, padel: S.padel, weights: S.weights, journal: S.journal, extras: S.extras });
+    const data = JSON.stringify({ v: 1, settings: S.settings, tests: S.tests, logs: S.logs.map(({ _id, ...l }) => ({ ...l, _id })), current: S.current, comp: S.comp, padel: S.padel, weights: S.weights, journal: S.journal, extras: S.extras, health: S.health });
     try { await navigator.clipboard.writeText(data); toast("Sauvegarde copiée"); }
     catch (e) { $("#bk-in").value = data; $("#bk-in").select(); toast("Copie-la depuis le champ"); }
   };
@@ -1969,7 +2198,7 @@ function renderSettings() {
     let d; try { d = JSON.parse($("#bk-in").value); } catch (e) { toast("Sauvegarde illisible"); return; }
     if (!d || !d.settings) { toast("Sauvegarde illisible"); return; }
     confirmSheet("Restaurer cette sauvegarde ?", "Elle remplace les données actuelles de l'appli.", "Restaurer", async () => {
-      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel); if (d.weights) Store.lsSet("weights", d.weights); if (d.journal) Store.lsSet("journal", d.journal); if (d.extras) Store.lsSet("extras", d.extras);
+      Store.lsSet("settings", d.settings); Store.lsSet("tests", d.tests || {}); Store.lsSet("logs", d.logs || []); Store.lsSet("current", d.current || null); if (d.comp) Store.lsSet("comp", d.comp); if (d.padel) Store.lsSet("padel", d.padel); if (d.weights) Store.lsSet("weights", d.weights); if (d.journal) Store.lsSet("journal", d.journal); if (d.extras) Store.lsSet("extras", d.extras); if (d.health) Store.lsSet("health", d.health);
       if (Store.mode === "db") await Store.upload().catch(() => {});
       location.reload();
     });
@@ -1986,7 +2215,7 @@ function renderSettings() {
     try { await Store.auth.signInWithEmailAndPassword(em, pw); toast("Connecté, je synchronise…"); setTimeout(() => location.reload(), 600); }
     catch (e) { li.disabled = false; li.textContent = "Se connecter"; toast(e.code === "auth/network-request-failed" ? "Pas de connexion internet" : "E-mail ou mot de passe incorrect"); }
   };
-  bindThemes();
+  bindThemes(); bindHealthSettings();
   const po = $("#push-on"); if (po) po.onclick = () => enablePush();
   const pt = $("#push-test"); if (pt) pt.onclick = () => { Store.lsSet("pushTest", Date.now() + 30000); syncReminders(); toast("Test programmé : il arrive d'ici 15 min max"); };
   const lo = $("#sy-out"); if (lo) lo.onclick = () => confirmSheet("Se déconnecter ?", "Tes données restent sur ton compte et sur ce téléphone.", "Se déconnecter", async () => { await Store.auth.signOut(); location.reload(); });
@@ -2350,7 +2579,13 @@ function jvList() {
 $("#jv").addEventListener("click", e => { if (e.target.closest('[data-jv="close"]')) closeJump(); });
 
 window.addEventListener("hashchange", route);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && T.h) tick(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (T.h) tick();
+  // Retour du raccourci « Pas » (ou appli rouverte) : compteur de pas et tournois des mimichats à jour
+  refreshSteps().then(ch => { const h = (location.hash || "#accueil").slice(1); if (ch && h === "accueil" && !$("#modal").classList.contains("on")) renderHome(); }).catch(() => {});
+  if (typeof pullTournaments === "function") pullTournaments().catch(() => {});
+});
 try { applyTheme((JSON.parse(localStorage.getItem("padelapp2:extras")) || {}).theme); } catch (e) {}
 (async function boot() {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -2376,11 +2611,14 @@ try { applyTheme((JSON.parse(localStorage.getItem("padelapp2:extras")) || {}).th
     S.weights = (await Store.get("weights")) || [];
     S.journal = (await Store.get("journal")) || [];
     S.extras = (await Store.get("extras")) || {};
+    S.health = (await Store.get("health")) || {};
+    S.steps = Store.mode === "db" ? (await Store.get("steps")) || {} : {};
     S.comp = (await Store.get("comp")) || seedComp(); if (!(await Store.get("comp"))) Store.set("comp", S.comp);
     S.settings = settings; S.current = current; S.tests = tests || {}; S.logs = logs || [];
   } catch (e) { if (Store.mode === "db") S.loadError = true; }
   S.extras = S.extras || {}; applyTheme(); checkUnlocks(true);
   route();
+  pullTournaments();
 })();
 </script>
 </body>
