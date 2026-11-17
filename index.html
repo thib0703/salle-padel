@@ -1055,7 +1055,7 @@ function renderSession(key) {
 const FORMS = [[1, "😫", "Cuit"], [2, "😕", "Bof"], [3, "🙂", "Correct"], [4, "😀", "Bien"], [5, "💪", "Au top"]];
 function formHtml(cur) {
   const f = cur?.form;
-  return `<div class="formbox ${f ? "fset" : ""}"><div class="small ${f ? "muted" : ""}"><b>${f ? "Forme du jour" : "Comment tu te sens ?"}</b>${f ? "" : " Sommeil, courbatures, énergie : la séance s'adapte."}</div>
+  return `<div class="formbox ${f ? "fset" : ""}"><div class="small ${f ? "muted" : ""}"><b>${f ? "Forme du jour" : "Comment tu te sens après l'échauffement ?"}</b>${f ? "" : " Pas en arrivant : la fatigue de fin de journée passe souvent en 10 min. Note-la seulement si tu es encore à plat, la séance s'allège."}</div>
     <div class="forms">${FORMS.map(([n, e, l]) => `<button type="button" class="fbtn ${f === n ? "on" : ""}" data-form="${n}" aria-pressed="${f === n}"><span>${e}</span><small>${l}</small></button>`).join("")}</div></div>`;
 }
 
@@ -1607,7 +1607,7 @@ async function enablePush() {
 // Eau : verres de 25 cl notés dans l'appli. Objectifs plus hauts les jours d'entraînement.
 const STEPS_FN = "https://europe-west9-les-mimichats.cloudfunctions.net/pasSallePadel";
 const SHORTCUT_NAME = "Pas Salle Padel";
-const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30", bottle: 75 };
+const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30", bottle: 75, wakeWk: "06:30", sleepGoal: 8 };
 const H = () => ({ ...HDEF, ...(S.health || {}) });
 function saveHealth() { return Store.set("health", S.health).catch(() => toast("Sauvegarde impossible")); }
 // Jours de salle (faits ou prévus cette semaine), calculés une fois
@@ -1650,6 +1650,45 @@ function ring(p, size = 64, col = "var(--ball)") {
   const r = size / 2 - 5, c = 2 * Math.PI * r, f = Math.min(1, Math.max(0, p));
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true" style="flex:none"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--court-3)" stroke-width="7"/>${f > 0 ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c * f} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ""}</svg>`;
 }
+// ---- Sommeil : heure de coucher notée à la main ; réveil fixe en semaine (réglable), à noter le week-end
+const sleepOf = iso => (S.health?.sleep || {})[iso];
+const hmMin = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+function sleepMin(e) { if (!e?.bed || !e?.wake) return null; let d = hmMin(e.wake) - hmMin(e.bed); if (d <= 0) d += 1440; return d; }
+const hFmt = m => m == null ? "–" : Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0");
+const isWeekday = iso => { const g = parseISO(iso).getDay(); return g >= 1 && g <= 5; };
+function sleepAvg(n = 14) {
+  const v = Array.from({ length: n }, (_, i) => sleepMin(sleepOf(plusDays(isoDate(new Date()), -i)))).filter(x => x != null);
+  return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+}
+function sleepHtml() {
+  const iso = isoDate(new Date()), e = sleepOf(iso), wk = isWeekday(iso), avg = sleepAvg(), goal = H().sleepGoal * 60;
+  if (e) { const m = sleepMin(e);
+    return `<button class="ex" id="sl-edit" type="button" style="padding:10px 12px;display:flex;gap:10px;align-items:center;text-align:left;color:inherit;font:inherit;width:100%">
+      <span style="font-size:22px">😴</span><span style="flex:1"><b>${hFmt(m)}</b> <span class="small muted">cette nuit · ${e.bed.replace(":", "h")} → ${e.wake.replace(":", "h")}</span>
+      <span class="small muted" style="display:block">${avg != null ? "Moyenne 14 j : " + hFmt(avg) + " · " : ""}objectif ${H().sleepGoal} h</span></span>
+      <span class="chip ${m >= goal ? "good" : m >= goal - 60 ? "" : "warn"}">${m >= goal ? "✓" : "−" + hFmt(goal - m)}</span></button>`; }
+  const ti = (id, v) => `<input id="${id}" type="time" value="${v}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:16px;color:var(--chalk);flex:1;min-width:0">`;
+  const lastBed = (Object.entries(S.health?.sleep || {}).sort().pop() || [])[1]?.bed || "23:30";
+  return `<div class="ex" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+    <div class="row between"><b>😴 Ta nuit</b><span class="small muted">${wk ? "réveil " + H().wakeWk.replace(":", "h") + " (semaine)" : "week-end"}</span></div>
+    <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="small muted">Couché à</span>${ti("sl-bed", lastBed)}${wk ? "" : `<span class="small muted">levé à</span>${ti("sl-wake", "09:00")}`}<button class="btn sm primary" id="sl-ok" type="button">OK</button></div></div>`;
+}
+async function saveSleep(iso, bed, wake) {
+  S.health = S.health || {}; S.health.sleep = { ...(S.health.sleep || {}), [iso]: { bed, wake } };
+  for (const k of Object.keys(S.health.sleep).sort().slice(0, -120)) delete S.health.sleep[k];
+  await saveHealth();
+}
+function sleepSheet(iso) {
+  const e = sleepOf(iso) || {};
+  openSheet(`<h2>Nuit du ${frDate(plusDays(iso, -1))} au ${frDate(iso)}</h2>
+    <div class="row"><label class="fld" style="flex:1">Couché à<input id="ss-bed" type="time" value="${e.bed || "23:30"}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    <label class="fld" style="flex:1">Levé à<input id="ss-wake" type="time" value="${e.wake || H().wakeWk}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label></div>
+    <button class="btn sm danger" id="ss-del" type="button" style="align-self:flex-start">Effacer cette nuit</button>`, async () => {
+    const b = $("#ss-bed").value, w = $("#ss-wake").value; if (!b || !w) { toast("Indique les deux heures"); return false; }
+    await saveSleep(iso, b, w); toast("Nuit enregistrée : " + hFmt(sleepMin({ bed: b, wake: w })));
+  }, renderHome);
+  $("#ss-del").onclick = async () => { delete S.health.sleep[iso]; await saveHealth(); $("#modal").classList.remove("on"); renderHome(); };
+}
 function healthHtml() {
   const iso = isoDate(new Date()), gym = gymDaySet(), kind = dayKind(iso, gym);
   const sg = stepGoalFor(iso, gym), st = stepsOf(iso), wg = waterGoalFor(iso, gym), w = waterOf(iso), streak = stepStreak(gym);
@@ -1666,7 +1705,8 @@ function healthHtml() {
       <span style="min-width:0;flex:1"><b class="num" style="font-size:20px">${litres(w)}</b><span class="small muted" style="display:block">/ ${litres(wg)}</span></span>
     </div></div>
     <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn sm ghost" id="h-wm" type="button" aria-label="Retirer un verre" style="flex:0 0 52px">−</button><button class="btn sm primary" id="h-wp" type="button" style="flex:1;white-space:nowrap">+ 🥛 Verre</button><button class="btn sm primary" id="h-wb" type="button" style="flex:1;white-space:nowrap">+ 🧴 Bouteille</button></div>
-    <p class="small muted" style="margin:-4px 0 0">Objectifs du ${kindTxt}. Verre = 25 cl · bouteille = ${H().bottle} cl (réglable).</p>`;
+    <p class="small muted" style="margin:-4px 0 0">Objectifs du ${kindTxt}. Verre = 25 cl · bouteille = ${H().bottle} cl (réglable).</p>
+    ${sleepHtml()}`;
 }
 function bindHealth() {
   const p = $("#h-wp"), m = $("#h-wm"), s = $("#h-steps");
@@ -1676,6 +1716,13 @@ function bindHealth() {
   const b = $("#h-wb"); if (b) b.onclick = () => drink(Math.round(H().bottle / 25));
   if (m) m.onclick = async () => { if (!waterOf(isoDate(new Date()))) return; await addWater(-1); renderHome(); };
   if (s) s.onclick = () => healthSheet();
+  const iso = isoDate(new Date());
+  const ok = $("#sl-ok"); if (ok) ok.onclick = async () => {
+    const bed = $("#sl-bed").value, wake = $("#sl-wake") ? $("#sl-wake").value : H().wakeWk;
+    if (!bed || !wake) { toast("Indique l'heure"); return; }
+    await saveSleep(iso, bed, wake); toast("Nuit enregistrée : " + hFmt(sleepMin({ bed, wake }))); renderHome();
+  };
+  const se = $("#sl-edit"); if (se) se.onclick = () => sleepSheet(iso);
 }
 function healthSheet() {
   const gym = gymDaySet(), today = isoDate(new Date());
@@ -1686,9 +1733,14 @@ function healthSheet() {
   const done = days.filter(d => stepsOf(d) >= stepGoalFor(d, gym)).length;
   const avg = Math.round(days.filter(d => stepsOf(d) != null).reduce((s, d) => s + stepsOf(d), 0) / Math.max(1, days.filter(d => stepsOf(d) != null).length));
   const wDays = days.filter(d => waterOf(d) >= waterGoalFor(d, gym)).length;
-  $("#sheet").innerHTML = `<h2>Pas & hydratation · 14 jours</h2>
+  const sl = days.map(d => sleepMin(sleepOf(d))), slMax = Math.max(H().sleepGoal * 60, ...sl.filter(x => x != null));
+  const slBars = days.map((d, i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="height:70px;width:100%;display:flex;align-items:flex-end;position:relative"><div style="position:absolute;left:0;right:0;bottom:${H().sleepGoal * 60 / slMax * 100}%;border-top:1px dashed var(--muted);opacity:.5"></div><div style="width:100%;height:${(sl[i] || 0) / slMax * 100}%;background:#9B8CFF;border-radius:4px 4px 0 0;opacity:${sl[i] ? 1 : .2}"></div></div><span style="font-size:10px;color:var(--muted)">${parseISO(d).getDate()}</span></div>`).join("");
+  $("#sheet").innerHTML = `<h2>Pas, eau & sommeil · 14 jours</h2>
     <div style="display:flex;gap:3px">${bars}</div>
     <p class="small" style="margin:0">Objectif de pas atteint <b>${done} jour${done > 1 ? "s" : ""} sur 14</b> · moyenne <b>${frNum(avg)}</b> pas. Objectif d'eau atteint <b>${wDays} jour${wDays > 1 ? "s" : ""}</b>. La ligne pointillée est l'objectif du jour (+${frNum(H().restBonus)} pas les jours de repos).</p>
+    <h3 style="margin:6px 0 0">😴 Sommeil</h3>
+    <div style="display:flex;gap:3px">${slBars}</div>
+    <p class="small" style="margin:0">Moyenne : <b>${hFmt(sleepAvg())}</b> par nuit (objectif ${H().sleepGoal} h). Pour corriger une nuit, touche la carte 😴 sur l'écran Semaine.</p>
     <a class="btn block" href="shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}">↻ Mettre à jour mes pas maintenant</a>
     <span class="small muted">Lance le raccourci, puis reviens dans l'appli : le compteur se met à jour tout seul.</span>
     <button class="btn ghost block" id="h-cfg" type="button">Objectifs et installation du raccourci ›</button>
@@ -1712,10 +1764,12 @@ async function ensureStepsKey() {
 function healthSettingsHtml() {
   const h = H();
   const tog = (id, on, label, sub) => `<div class="toggle"><div><b>${label}</b><div class="small muted">${sub}</div></div><button class="sw" id="${id}" role="switch" aria-checked="${on}" aria-label="${label}"></button></div>`;
-  return `<h2 style="margin-top:12px" id="health-set">Pas & hydratation</h2>
+  return `<h2 style="margin-top:12px" id="health-set">Pas, eau & sommeil</h2>
     <div class="row"><label class="fld" style="flex:1">Objectif de pas${inp("hs-sg", "12000", h.stepGoal, "numeric")}</label><label class="fld" style="flex:1">+ jours de repos${inp("hs-rb", "1000", h.restBonus, "numeric")}</label></div>
     <label class="fld">Eau par jour (litres, hors entraînement)${inp("hs-w", "2,5", String(h.waterL).replace(".", ","), "decimal")}</label>
     <p class="small muted" style="margin:-4px 0 0">Jour de salle ou de padel : +0,5 L. Jour de tournoi : +1 L.</p>
+    <div class="row"><label class="fld" style="flex:1">Réveil en semaine<input id="hs-wk" type="time" value="${h.wakeWk}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+      <label class="fld" style="flex:1">Objectif sommeil<select id="hs-sl">${[6, 6.5, 7, 7.5, 8, 8.5, 9].map(x => `<option value="${x}" ${+h.sleepGoal === x ? "selected" : ""}>${String(x).replace(".5", " h 30").replace(/^(\d)$/, "$1 h")}</option>`).join("")}</select></label></div>
     <label class="fld">Ma bouteille (bouton 🧴)<select id="hs-b">${[50, 75, 100, 150].map(x => `<option value="${x}" ${+h.bottle === x ? "selected" : ""}>${x < 100 ? x + " cl" : String(x / 100).replace(".", ",") + " L"}</option>`).join("")}</select></label>
     ${tog("hs-hy", h.hydra, "Rappels pour boire", "Ils s'arrêtent dès que l'objectif du jour est atteint")}
     <div class="row"><label class="fld" style="flex:1">De<input id="hs-f" type="time" value="${h.hFrom}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label><label class="fld" style="flex:1">À<input id="hs-t" type="time" value="${h.hTo}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
@@ -1751,7 +1805,7 @@ function bindHealthSettings() {
     if (!w || w < 1 || w > 6) { toast("Eau : entre 1 et 6 litres"); return; }
     const f = $("#hs-f").value || HDEF.hFrom, t = $("#hs-t").value || HDEF.hTo;
     if (t <= f) { toast("L'heure de fin doit être après le début"); return; }
-    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt, bottle: +$("#hs-b").value };
+    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt, bottle: +$("#hs-b").value, wakeWk: $("#hs-wk").value || HDEF.wakeWk, sleepGoal: +$("#hs-sl").value };
     await saveHealth(); syncReminders(); toast("Réglages enregistrés");
   };
   const box = $("#hs-sc"); if (!box || Store.mode !== "db") return;
