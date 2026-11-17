@@ -1607,7 +1607,7 @@ async function enablePush() {
 // Eau : verres de 25 cl notés dans l'appli. Objectifs plus hauts les jours d'entraînement.
 const STEPS_FN = "https://europe-west9-les-mimichats.cloudfunctions.net/pasSallePadel";
 const SHORTCUT_NAME = "Pas Salle Padel";
-const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30" };
+const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30", bottle: 75 };
 const H = () => ({ ...HDEF, ...(S.health || {}) });
 function saveHealth() { return Store.set("health", S.health).catch(() => toast("Sauvegarde impossible")); }
 // Jours de salle (faits ou prévus cette semaine), calculés une fois
@@ -1663,14 +1663,17 @@ function healthHtml() {
     </button>
     <div class="ex" style="flex:1;min-width:0;padding:10px;display:flex;gap:8px;align-items:center">
       <span style="position:relative;display:grid;place-items:center">${ring(w / wg, 54, w >= wg ? "var(--good)" : "#5BB8F4")}<span style="position:absolute;font-size:18px">💧</span></span>
-      <span style="min-width:0;flex:1"><b class="num" style="font-size:20px">${litres(w)}</b><span class="small muted" style="display:block">/ ${litres(wg)}</span>
-        <span class="row" style="gap:6px;margin-top:6px;flex-wrap:nowrap"><button class="btn sm ghost" id="h-wm" type="button" aria-label="Retirer un verre" style="padding:6px 0;flex:1">−</button><button class="btn sm primary" id="h-wp" type="button" aria-label="Ajouter un verre" style="padding:6px 0;flex:2;white-space:nowrap">+1 💧</button></span></span>
+      <span style="min-width:0;flex:1"><b class="num" style="font-size:20px">${litres(w)}</b><span class="small muted" style="display:block">/ ${litres(wg)}</span></span>
     </div></div>
-    <p class="small muted" style="margin:-4px 0 0">Objectifs du ${kindTxt}. Un verre = 25 cl.</p>`;
+    <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn sm ghost" id="h-wm" type="button" aria-label="Retirer un verre" style="flex:0 0 52px">−</button><button class="btn sm primary" id="h-wp" type="button" style="flex:1;white-space:nowrap">+ 🥛 Verre</button><button class="btn sm primary" id="h-wb" type="button" style="flex:1;white-space:nowrap">+ 🧴 Bouteille</button></div>
+    <p class="small muted" style="margin:-4px 0 0">Objectifs du ${kindTxt}. Verre = 25 cl · bouteille = ${H().bottle} cl (réglable).</p>`;
 }
 function bindHealth() {
   const p = $("#h-wp"), m = $("#h-wm"), s = $("#h-steps");
-  if (p) p.onclick = async () => { await addWater(1); const iso = isoDate(new Date()); if (waterOf(iso) === waterGoalFor(iso)) toast("Objectif d'eau atteint 💧 Plus de rappels aujourd'hui"); renderHome(); };
+  const drink = async n => { const iso = isoDate(new Date()), g = waterGoalFor(iso), before = waterOf(iso); await addWater(n);
+    toast(before < g && waterOf(iso) >= g ? "Objectif d'eau atteint 💧 Plus de rappels aujourd'hui" : "+" + n * 25 + " cl · " + litres(waterOf(iso))); renderHome(); };
+  if (p) p.onclick = () => drink(1);
+  const b = $("#h-wb"); if (b) b.onclick = () => drink(Math.round(H().bottle / 25));
   if (m) m.onclick = async () => { if (!waterOf(isoDate(new Date()))) return; await addWater(-1); renderHome(); };
   if (s) s.onclick = () => healthSheet();
 }
@@ -1713,6 +1716,7 @@ function healthSettingsHtml() {
     <div class="row"><label class="fld" style="flex:1">Objectif de pas${inp("hs-sg", "12000", h.stepGoal, "numeric")}</label><label class="fld" style="flex:1">+ jours de repos${inp("hs-rb", "1000", h.restBonus, "numeric")}</label></div>
     <label class="fld">Eau par jour (litres, hors entraînement)${inp("hs-w", "2,5", String(h.waterL).replace(".", ","), "decimal")}</label>
     <p class="small muted" style="margin:-4px 0 0">Jour de salle ou de padel : +0,5 L. Jour de tournoi : +1 L.</p>
+    <label class="fld">Ma bouteille (bouton 🧴)<select id="hs-b">${[50, 75, 100, 150].map(x => `<option value="${x}" ${+h.bottle === x ? "selected" : ""}>${x < 100 ? x + " cl" : String(x / 100).replace(".", ",") + " L"}</option>`).join("")}</select></label>
     ${tog("hs-hy", h.hydra, "Rappels pour boire", "Ils s'arrêtent dès que l'objectif du jour est atteint")}
     <div class="row"><label class="fld" style="flex:1">De<input id="hs-f" type="time" value="${h.hFrom}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label><label class="fld" style="flex:1">À<input id="hs-t" type="time" value="${h.hTo}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
       <label class="fld" style="flex:1">Toutes les<select id="hs-e">${[1, 1.5, 2, 3].map(x => `<option value="${x}" ${+h.hEvery === x ? "selected" : ""}>${String(x).replace(".", ",")} h</option>`).join("")}</select></label></div>
@@ -1747,7 +1751,7 @@ function bindHealthSettings() {
     if (!w || w < 1 || w > 6) { toast("Eau : entre 1 et 6 litres"); return; }
     const f = $("#hs-f").value || HDEF.hFrom, t = $("#hs-t").value || HDEF.hTo;
     if (t <= f) { toast("L'heure de fin doit être après le début"); return; }
-    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt };
+    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt, bottle: +$("#hs-b").value };
     await saveHealth(); syncReminders(); toast("Réglages enregistrés");
   };
   const box = $("#hs-sc"); if (!box || Store.mode !== "db") return;
