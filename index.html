@@ -1567,7 +1567,7 @@ function buildReminders() {
       const d = plusDays(today, i), pad = padelOn(d);
       for (const p of pad) if (p.type !== "tournoi" && p.time) add(`etir-${d}-${p.id}`, at(d, p.time) + ((+p.dur || 90) + 20) * 60000, "Étirements après le padel 🧘", "8 min de récup guidée : bouton « Récup après » dans l'appli.", "./#accueil");
       if (d > sun || pad.length || gym.has(d) || homeOn(d) || out.some(x => x.id === `home-${d}`)) continue;
-      add(`mob-${d}`, at(d, "20:30"), "Motricité ou étirements ce soir ? 🤸", homeThisWeek() < HOME_TARGET ? `Séance M (20 min) : ${homeThisWeek()}/${HOME_TARGET} cette semaine.` : "10 min d'étirements suffisent pour récupérer.", "./#seance-m");
+      add(`mob-${d}`, at(d, h.mobAt || "18:30"), "Motricité ou étirements ce soir ? 🤸", homeThisWeek() < HOME_TARGET ? `Séance M (20 min) : ${homeThisWeek()}/${HOME_TARGET} cette semaine.` : "10 min d'étirements suffisent pour récupérer.", "./#seance-m");
     }
   }
   // Rappel de test (bouton dans Réglages) : gardé 20 min pour que la fonction le voie
@@ -1604,7 +1604,7 @@ async function enablePush() {
 // Eau : verres de 25 cl notés dans l'appli. Objectifs plus hauts les jours d'entraînement.
 const STEPS_FN = "https://europe-west9-les-mimichats.cloudfunctions.net/pasSallePadel";
 const SHORTCUT_NAME = "Pas Salle Padel";
-const HDEF = { stepGoal: 8000, restBonus: 2000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true };
+const HDEF = { stepGoal: 8000, restBonus: 2000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30" };
 const H = () => ({ ...HDEF, ...(S.health || {}) });
 function saveHealth() { return Store.set("health", S.health).catch(() => toast("Sauvegarde impossible")); }
 // Jours de salle (faits ou prévus cette semaine), calculés une fois
@@ -1714,6 +1714,7 @@ function healthSettingsHtml() {
     <div class="row"><label class="fld" style="flex:1">De<input id="hs-f" type="time" value="${h.hFrom}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label><label class="fld" style="flex:1">À<input id="hs-t" type="time" value="${h.hTo}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
       <label class="fld" style="flex:1">Toutes les<select id="hs-e">${[1, 1.5, 2, 3].map(x => `<option value="${x}" ${+h.hEvery === x ? "selected" : ""}>${String(x).replace(".", ",")} h</option>`).join("")}</select></label></div>
     ${tog("hs-st", h.stretch, "Rappels étirements & motricité", "Après le padel, et les soirs sans salle ni padel")}
+    <label class="fld">Heure du rappel motricité (soirs sans entraînement)<input id="hs-mob" type="time" value="${h.mobAt}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
     <button class="btn primary block" id="hs-save" type="button">Enregistrer</button>
     <details class="how" style="border:1px solid var(--line);border-radius:var(--r)"><summary>Installer le raccourci des pas (une seule fois)</summary><div class="how-body" id="hs-sc">
       ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro (plus haut).</p>` : `<p class="small muted" style="margin:0">Chargement…</p>`}</div></details>`;
@@ -1743,7 +1744,7 @@ function bindHealthSettings() {
     if (!w || w < 1 || w > 6) { toast("Eau : entre 1 et 6 litres"); return; }
     const f = $("#hs-f").value || HDEF.hFrom, t = $("#hs-t").value || HDEF.hTo;
     if (t <= f) { toast("L'heure de fin doit être après le début"); return; }
-    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true" };
+    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt };
     await saveHealth(); syncReminders(); toast("Réglages enregistrés");
   };
   const box = $("#hs-sc"); if (!box || Store.mode !== "db") return;
