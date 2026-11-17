@@ -1579,9 +1579,12 @@ let remT = null;
 function syncReminders() {
   if (Store.mode !== "db" || !Store.lsGet("pushOn")) return;
   clearTimeout(remT); remT = setTimeout(() => {
-    const items = buildReminders(), sig = JSON.stringify(items);
+    const items = buildReminders(), gym = gymDaySet();
+    // Objectif de pas de chaque jour : la fonction « pasSallePadel » prévient le soir s'il en manque
+    const stepGoals = Object.fromEntries(Array.from({ length: 9 }, (_, i) => { const d = plusDays(isoDate(new Date()), i); return [d, stepGoalFor(d, gym)]; }));
+    const sig = JSON.stringify([items, stepGoals]);
     if (sig === Store.lsGet("pushSig")) return;
-    pushRef().doc("plan").set({ items, updated: Date.now() }, { merge: true }).then(() => Store.lsSet("pushSig", sig)).catch(() => {});
+    pushRef().doc("plan").set({ items, stepGoals, updated: Date.now() }, { merge: true }).then(() => Store.lsSet("pushSig", sig)).catch(() => {});
   }, 1500);
 }
 async function enablePush() {
