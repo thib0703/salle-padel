@@ -2559,18 +2559,19 @@ function jumpHtml() {
         <li>Téléphone posé au sol ou calé, à 1-2 m, cadré sur tes pieds. Pas tenu à la main.</li>
         <li>Mains sur les hanches, flexion libre, saut au max. Toujours le même saut.</li>
         <li>Atterris jambes tendues, sur les pointes. Genoux pliés en l'air = hauteur gonflée.</li>
-        <li>3 sauts dans la même vidéo, 20-30 s de repos entre chaque : tu les mesures à la suite et on garde le meilleur.</li>
+        <li>3 sauts, 20-30 s de repos entre chaque. Le plus simple : <b>une courte vidéo par saut</b>, et tu sélectionnes les 3 d'un coup. On garde le meilleur.</li>
       </ul></div></details>
     </div>`;
 }
 function bindJump() { $("#jv-open").onclick = openJump; }
 function openJump() {
-  Object.assign(JV, { url: null, fd: 1 / 30, n: 0, frames: 0, a: null, b: null, f: null, jumps: [] });
+  Object.assign(JV, { url: null, fd: 1 / 30, n: 0, frames: 0, a: null, b: null, f: null, jumps: [], files: [], cur: 0 });
   $("#jv").classList.add("on"); document.body.style.overflow = "hidden";
   $("#jv").innerHTML = `<div class="jv-in">
     <div class="row between"><h2>Mesurer un saut</h2><button class="btn sm ghost" data-jv="close" type="button">Fermer</button></div>
-    <label class="btn primary block" style="position:relative">Choisir la vidéo au ralenti<input id="jv-file" type="file" accept="video/*" style="position:absolute;inset:0;opacity:0;width:100%"></label>
-    <p class="small muted" style="margin:0">Prends la vidéo dans ta photothèque. Si tu n'as pas encore filmé : appareil photo › Ralenti, téléphone posé, pieds dans le cadre.</p>
+    <label class="btn primary block" id="jv-pick" style="position:relative">Choisir les vidéos au ralenti<input id="jv-file" type="file" accept="video/*" multiple style="position:absolute;inset:0;opacity:0;width:100%"></label>
+    <p class="small muted" style="margin:0" id="jv-help">Une vidéo par saut : sélectionne-les toutes d'un coup dans ta photothèque (une seule vidéo avec les 3 sauts marche aussi). Pas encore filmé : appareil photo › Ralenti, téléphone posé, pieds dans le cadre.</p>
+    <div id="jv-tabs" class="row wrap" style="gap:6px"></div>
     <div id="jv-work" hidden>
       <video id="jv-v" playsinline muted preload="auto"></video>
       <div class="row between small"><span id="jv-pos" class="num muted"></span><span id="jv-fps" class="muted"></span></div>
@@ -2584,7 +2585,21 @@ function openJump() {
       <div id="jv-list"></div>
     </div>
   </div>`;
-  $("#jv-file").onchange = e => { const f = e.target.files[0]; if (f) loadJumpVideo(f); };
+  $("#jv-file").onchange = jvAddFiles;
+}
+// Plusieurs vidéos (une par saut) : on les mesure l'une après l'autre, les sauts gardés s'additionnent
+function jvAddFiles(e) {
+  const fs = [...(e.target.files || [])].filter(f => /^video\//.test(f.type) || /\.(mov|mp4|m4v)$/i.test(f.name)); e.target.value = "";
+  if (!fs.length) return;
+  const first = JV.files.length; JV.files.push(...fs);
+  $("#jv-pick").hidden = true; $("#jv-help").hidden = true;
+  jvOpenFile(first);
+}
+function jvOpenFile(i) { JV.cur = i; jvTabs(); loadJumpVideo(JV.files[i]); }
+function jvTabs() {
+  const el = $("#jv-tabs"); if (!el) return;
+  el.innerHTML = JV.files.length > 1 ? JV.files.map((f, i) => `<button type="button" class="chip ${i === JV.cur ? "ball" : ""}" data-jvf="${i}" style="border:0">Vidéo ${i + 1}${JV.jumps.some(j => j.v === i) ? " ✓" : ""}</button>`).join("") : "";
+  el.querySelectorAll("[data-jvf]").forEach(b => b.onclick = () => { const i = +b.dataset.jvf; if (i !== JV.cur) jvOpenFile(i); });
 }
 function closeJump() { const v = $("#jv-v"); if (v) { v.pause(); v.removeAttribute("src"); v.load(); } if (JV.url) URL.revokeObjectURL(JV.url); JV.url = null; $("#jv").classList.remove("on"); $("#jv").innerHTML = ""; document.body.style.overflow = ""; if (location.hash === "#tests") renderTests(); }
 async function loadJumpVideo(file) {
@@ -2640,7 +2655,11 @@ function jvResult() {
     </div>
     <button class="btn primary block" id="jv-keep" type="button">Garder ce saut</button>`;
   el.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { JV.f = +b.dataset.fx; jvResult(); });
-  $("#jv-keep").onclick = () => { JV.jumps.push({ cm, t: Math.round(t * 1000) / 1000 }); JV.a = JV.b = null; toast("Saut " + JV.jumps.length + " : " + fmt(cm) + " cm"); jvResult(); };
+  $("#jv-keep").onclick = () => {
+    JV.jumps.push({ cm, t: Math.round(t * 1000) / 1000, v: JV.cur }); JV.a = JV.b = null; toast("Saut " + JV.jumps.length + " : " + fmt(cm) + " cm");
+    const next = JV.files.findIndex((f, i) => i > JV.cur && !JV.jumps.some(j => j.v === i));
+    if (next >= 0) jvOpenFile(next); else { jvTabs(); jvResult(); }
+  };
   jvList();
 }
 function jvList() {
@@ -2649,12 +2668,14 @@ function jvList() {
   const cur = num(S.tests?.jump?.[col]);
   el.innerHTML = `<div class="notice info small" style="display:grid;gap:8px">
     <div>${JV.jumps.map((j, i) => `Saut ${i + 1} : <b>${fmt(j.cm)} cm</b>`).join(" · ")}</div>
-    <div>Tu peux mesurer le saut suivant dans la même vidéo. Meilleur : <b>${fmt(best.cm)} cm</b>.</div>
+    <div>${JV.files.some((f, i) => !JV.jumps.some(j => j.v === i)) ? "Passe à la vidéo suivante" : "Mesure le saut suivant (dans cette vidéo ou une autre)"}. Meilleur : <b>${fmt(best.cm)} cm</b>.</div>
+    <label class="btn block" style="position:relative">+ Ajouter une vidéo<input id="jv-more" type="file" accept="video/*" multiple style="position:absolute;inset:0;opacity:0;width:100%"></label>
     <button class="btn primary block" id="jv-save" type="button">Enregistrer ${fmt(best.cm)} cm (colonne ${colName})</button>
     ${cur != null ? `<span class="muted">Remplace les ${fmt(cur)} cm déjà notés dans cette colonne.</span>` : ""}</div>`;
+  $("#jv-more").onchange = jvAddFiles;
   $("#jv-save").onclick = async () => {
     S.tests = S.tests || {}; S.tests.jump = { ...(S.tests.jump || {}), [col]: fmt(best.cm) };
-    S.extras.jumps = [...(S.extras.jumps || []), { date: isoDate(new Date()), cm: best.cm, t: best.t, all: JV.jumps.map(j => j.cm) }].slice(-60);
+    S.extras.jumps = [...(S.extras.jumps || []), { date: isoDate(new Date()), cm: best.cm, t: best.t, all: JV.jumps.map(j => j.cm), videos: JV.files.length }].slice(-60);
     await Promise.all([Store.set("tests", S.tests), saveExtras()]).catch(() => toast("Sauvegarde impossible"));
     toast("Détente enregistrée : " + fmt(best.cm) + " cm"); closeJump();
   };
