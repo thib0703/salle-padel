@@ -1473,6 +1473,8 @@ function buildReminders() {
   // Séance maison : jeudi 18 h 30 si l'objectif de la semaine n'est pas atteint
   const thu = plusDays(isoDate(mondayOf(new Date())), 3);
   if (homeThisWeek() < HOME_TARGET) add(`home-${thu}`, at(thu, "18:30"), "Séance M ce soir ?", `${homeThisWeek()}/${HOME_TARGET} cette semaine. 20 min à la maison pour tes appuis.`, "./#seance-m");
+  // Rappel de test (bouton dans Réglages) : gardé 20 min pour que la fonction le voie
+  const tst = Store.lsGet("pushTest"); if (tst && tst > now - 20 * 60000) out.push({ id: "test-" + tst, at: tst, title: "Test Salle Padel 🎾", body: "Les rappels marchent !", url: "./#reglages" });
   return out.sort((a, b) => a.at - b.at);
 }
 const pushRef = () => Store.db.collection("sallePadel").doc(Store.user.uid).collection("push");
@@ -1857,7 +1859,7 @@ function renderSettings() {
     ${syncHtml()}
     <h2 style="margin-top:12px">Rappels</h2>
     ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro ci-dessus : les rappels passent par ton compte.</p>`
-      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li></ul></div><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
+      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li></ul></div><button class="btn primary block" id="push-test" type="button">Envoyer une notification de test</button><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
       : `<p class="small muted" style="margin:0">Séance du lendemain, échauffement avant un match, pesée du lundi, match à noter… L'appli doit être ouverte depuis son icône sur l'écran d'accueil.</p><button class="btn primary block" id="push-on" type="button">Activer les rappels</button>`}
     <h2 style="margin-top:12px">Nouveau cycle</h2>
     <p class="small muted" style="margin:0">Tu es au cycle ${cycleNo()}. Repars en semaine 1 aujourd'hui : un cycle sur deux, quelques exercices changent. Historique et charges conservés.</p>
@@ -1898,6 +1900,7 @@ function renderSettings() {
     catch (e) { li.disabled = false; li.textContent = "Se connecter"; toast(e.code === "auth/network-request-failed" ? "Pas de connexion internet" : "E-mail ou mot de passe incorrect"); }
   };
   const po = $("#push-on"); if (po) po.onclick = () => enablePush();
+  const pt = $("#push-test"); if (pt) pt.onclick = () => { Store.lsSet("pushTest", Date.now() + 30000); syncReminders(); toast("Test programmé : il arrive d'ici 15 min max"); };
   const lo = $("#sy-out"); if (lo) lo.onclick = () => confirmSheet("Se déconnecter ?", "Tes données restent sur ton compte et sur ce téléphone.", "Se déconnecter", async () => { await Store.auth.signOut(); location.reload(); });
 }
 
