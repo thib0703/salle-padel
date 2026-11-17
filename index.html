@@ -1656,22 +1656,37 @@ const hmMin = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m;
 function sleepMin(e) { if (!e?.bed || !e?.wake) return null; let d = hmMin(e.wake) - hmMin(e.bed); if (d <= 0) d += 1440; return d; }
 const hFmt = m => m == null ? "–" : Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0");
 const isWeekday = iso => { const g = parseISO(iso).getDay(); return g >= 1 && g <= 5; };
+const napOf = iso => (S.health?.nap || {})[iso] || 0;
+// Sommeil sur 24 h : nuit + sieste du jour
+const dayRest = iso => { const n = sleepMin(sleepOf(iso)); return n == null ? null : n + napOf(iso); };
+function napRow(iso) {
+  const n = napOf(iso);
+  return `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><span class="small muted">💤 Sieste${n ? ` : <b style="color:var(--chalk)">${n} min</b>` : ""}</span>
+    ${[10, 15, 20, 30, 45, 60].map(m => `<button class="chip ${n === m ? "ball" : ""}" data-nap="${m}" type="button" style="border:0;padding:6px 10px">${m}</button>`).join("")}
+    ${n ? `<button class="chip" data-nap="0" type="button" style="border:0;padding:6px 10px">✕</button>` : ""}</div>`;
+}
+async function saveNap(iso, m) {
+  S.health = S.health || {}; S.health.nap = { ...(S.health.nap || {}) };
+  if (m) S.health.nap[iso] = m; else delete S.health.nap[iso];
+  for (const k of Object.keys(S.health.nap).sort().slice(0, -120)) delete S.health.nap[k];
+  await saveHealth();
+}
 function sleepAvg(n = 14) {
-  const v = Array.from({ length: n }, (_, i) => sleepMin(sleepOf(plusDays(isoDate(new Date()), -i)))).filter(x => x != null);
+  const v = Array.from({ length: n }, (_, i) => dayRest(plusDays(isoDate(new Date()), -i))).filter(x => x != null);
   return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
 }
 function sleepHtml() {
   const iso = isoDate(new Date()), e = sleepOf(iso), wk = isWeekday(iso), avg = sleepAvg(), goal = H().sleepGoal * 60;
-  if (e) { const m = sleepMin(e);
-    return `<button class="ex" id="sl-edit" type="button" style="padding:10px 12px;display:flex;gap:10px;align-items:center;text-align:left;color:inherit;font:inherit;width:100%">
-      <span style="font-size:22px">😴</span><span style="flex:1"><b>${hFmt(m)}</b> <span class="small muted">cette nuit · ${e.bed.replace(":", "h")} → ${e.wake.replace(":", "h")}</span>
-      ${avg != null ? `<span class="small muted" style="display:block">Moyenne 14 j : ${hFmt(avg)}</span>` : ""}</span>
-      ${goal ? `<span class="chip ${m >= goal ? "good" : m >= goal - 60 ? "" : "warn"}">${m >= goal ? "✓" : "−" + hFmt(goal - m)}</span>` : ""}</button>`; }
+  if (e) { const m = sleepMin(e), tot = m + napOf(iso);
+    return `<div class="ex" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px"><button id="sl-edit" type="button" style="display:flex;gap:10px;align-items:center;text-align:left;color:inherit;font:inherit;width:100%;background:none;border:0;padding:0">
+      <span style="font-size:22px">😴</span><span style="flex:1"><b>${hFmt(tot)}</b> <span class="small muted">${napOf(iso) ? `nuit ${hFmt(m)} + sieste ${napOf(iso)} min` : `cette nuit · ${e.bed.replace(":", "h")} → ${e.wake.replace(":", "h")}`}</span>
+      ${avg != null ? `<span class="small muted" style="display:block">Moyenne 14 j (siestes comprises) : ${hFmt(avg)}</span>` : ""}</span>
+      ${goal ? `<span class="chip ${tot >= goal ? "good" : tot >= goal - 60 ? "" : "warn"}">${tot >= goal ? "✓" : "−" + hFmt(goal - tot)}</span>` : ""}</button>${napRow(iso)}</div>`; }
   const ti = (id, v) => `<input id="${id}" type="time" value="${v}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:16px;color:var(--chalk);flex:1;min-width:0">`;
   const lastBed = (Object.entries(S.health?.sleep || {}).sort().pop() || [])[1]?.bed || "23:30";
   return `<div class="ex" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
     <div class="row between"><b>😴 Ta nuit</b><span class="small muted">${wk ? "réveil " + H().wakeWk.replace(":", "h") + " (semaine)" : "week-end"}</span></div>
-    <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="small muted">Couché à</span>${ti("sl-bed", lastBed)}${wk ? "" : `<span class="small muted">levé à</span>${ti("sl-wake", "09:00")}`}<button class="btn sm primary" id="sl-ok" type="button">OK</button></div></div>`;
+    <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="small muted">Couché à</span>${ti("sl-bed", lastBed)}${wk ? "" : `<span class="small muted">levé à</span>${ti("sl-wake", "09:00")}`}<button class="btn sm primary" id="sl-ok" type="button">OK</button></div>${napRow(iso)}</div>`;
 }
 async function saveSleep(iso, bed, wake) {
   S.health = S.health || {}; S.health.sleep = { ...(S.health.sleep || {}), [iso]: { bed, wake } };
@@ -1723,6 +1738,7 @@ function bindHealth() {
     await saveSleep(iso, bed, wake); toast("Nuit enregistrée : " + hFmt(sleepMin({ bed, wake }))); renderHome();
   };
   const se = $("#sl-edit"); if (se) se.onclick = () => sleepSheet(iso);
+  app.querySelectorAll("[data-nap]").forEach(b => b.onclick = async () => { const m = +b.dataset.nap; await saveNap(iso, napOf(iso) === m ? 0 : m); toast(m && napOf(iso) ? "Sieste : " + m + " min" : "Sieste effacée"); renderHome(); });
 }
 function healthSheet() {
   const gym = gymDaySet(), today = isoDate(new Date());
@@ -1733,14 +1749,14 @@ function healthSheet() {
   const done = days.filter(d => stepsOf(d) >= stepGoalFor(d, gym)).length;
   const avg = Math.round(days.filter(d => stepsOf(d) != null).reduce((s, d) => s + stepsOf(d), 0) / Math.max(1, days.filter(d => stepsOf(d) != null).length));
   const wDays = days.filter(d => waterOf(d) >= waterGoalFor(d, gym)).length;
-  const sl = days.map(d => sleepMin(sleepOf(d))), slMax = Math.max(H().sleepGoal * 60, 480, ...sl.filter(x => x != null));
-  const slBars = days.map((d, i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="height:70px;width:100%;display:flex;align-items:flex-end;position:relative">${H().sleepGoal ? `<div style="position:absolute;left:0;right:0;bottom:${H().sleepGoal * 60 / slMax * 100}%;border-top:1px dashed var(--muted);opacity:.5"></div>` : ""}<div style="width:100%;height:${(sl[i] || 0) / slMax * 100}%;background:#9B8CFF;border-radius:4px 4px 0 0;opacity:${sl[i] ? 1 : .2}"></div></div><span style="font-size:10px;color:var(--muted)">${parseISO(d).getDate()}</span></div>`).join("");
+  const sl = days.map(d => dayRest(d)), slMax = Math.max(H().sleepGoal * 60, 480, ...sl.filter(x => x != null));
+  const slBars = days.map((d, i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="height:70px;width:100%;display:flex;align-items:flex-end;position:relative">${H().sleepGoal ? `<div style="position:absolute;left:0;right:0;bottom:${H().sleepGoal * 60 / slMax * 100}%;border-top:1px dashed var(--muted);opacity:.5"></div>` : ""}<div style="width:100%;height:${(sl[i] || 0) / slMax * 100}%;display:flex;flex-direction:column;opacity:${sl[i] ? 1 : .2}"><div style="height:${sl[i] ? napOf(d) / sl[i] * 100 : 0}%;background:#C9C1FF;border-radius:4px 4px 0 0"></div><div style="flex:1;background:#9B8CFF;border-radius:${napOf(d) ? 0 : "4px 4px"} 0 0"></div></div></div><span style="font-size:10px;color:var(--muted)">${parseISO(d).getDate()}</span></div>`).join("");
   $("#sheet").innerHTML = `<h2>Pas, eau & sommeil · 14 jours</h2>
     <div style="display:flex;gap:3px">${bars}</div>
     <p class="small" style="margin:0">Objectif de pas atteint <b>${done} jour${done > 1 ? "s" : ""} sur 14</b> · moyenne <b>${frNum(avg)}</b> pas. Objectif d'eau atteint <b>${wDays} jour${wDays > 1 ? "s" : ""}</b>. La ligne pointillée est l'objectif du jour (+${frNum(H().restBonus)} pas les jours de repos).</p>
     <h3 style="margin:6px 0 0">😴 Sommeil</h3>
     <div style="display:flex;gap:3px">${slBars}</div>
-    <p class="small" style="margin:0">Moyenne : <b>${hFmt(sleepAvg())}</b> par nuit${H().sleepGoal ? ` (objectif ${H().sleepGoal} h)` : ""}. Pour corriger une nuit, touche la carte 😴 sur l'écran Semaine.</p>
+    <p class="small" style="margin:0">Moyenne : <b>${hFmt(sleepAvg())}</b> par jour, siestes comprises (en clair sur le graphique)${H().sleepGoal ? ` (objectif ${H().sleepGoal} h)` : ""}. Pour corriger une nuit, touche la carte 😴 sur l'écran Semaine.</p>
     <a class="btn block" href="shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}">↻ Mettre à jour mes pas maintenant</a>
     <span class="small muted">Lance le raccourci, puis reviens dans l'appli : le compteur se met à jour tout seul.</span>
     <button class="btn ghost block" id="h-cfg" type="button">Objectifs et installation du raccourci ›</button>
