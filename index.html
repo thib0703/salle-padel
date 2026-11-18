@@ -277,6 +277,7 @@ label.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
   <div class="r-arrow" id="r-arrow">●</div>
   <div class="r-word" id="r-word"></div>
   <div class="r-time" id="r-time"></div>
+  <button class="btn primary" id="r-go" type="button" style="display:none;min-width:220px;font-size:18px;padding:16px 28px">▶ C'est parti</button>
   <div class="row"><button class="btn ghost" id="r-stop" type="button">Arrêter</button><button class="btn" id="r-skip" type="button">Passer ›</button></div>
 </div>
 
@@ -1257,30 +1258,52 @@ function reactTick() {
     beep(0, 700, .25); reactPhase("rest", R.rest);
   } else reactPhase("work", R.work);
 }
+// Guidé (avant-match, récup) : chaque étape s'affiche d'abord en pause, le temps de lire.
+// Le chrono ne part qu'en appuyant sur « C'est parti » ; à la fin, l'étape suivante attend à son tour.
+// Étirement « par jambe / par côté » : bip et « Change de côté » à mi-temps.
 function startGuided(steps, doneMsg = "Terminé !") {
   stopTimer(); stopReact(); unlockAudio();
-  Object.assign(R, { guided: steps, gi: -1 });
+  Object.assign(R, { guided: steps, gi: -1, run: false, left: 0, half: false, sides: false });
   $("#react").classList.add("on", "rest");
   try { navigator.wakeLock?.request("screen").then(l => R.lock = l).catch(() => {}); } catch (e) {}
-  const total = steps.reduce((a, s) => a + s[1], 0);
-  const next = () => {
-    R.gi++; if (R.gi >= steps.length) { beep(0, 660, .5); beep(.3, 880, .5); stopReact(); toast(doneMsg); return; }
-    const [n, sec, d] = steps[R.gi]; R.end = Date.now() + sec * 1000; R.cd = {};
+  const total = steps.reduce((a, s) => a + s[1], 0), go = $("#r-go");
+  const show = () => {
+    const [n, sec, d] = steps[R.gi];
     $("#r-info").textContent = `Étape ${R.gi + 1} / ${steps.length} · ${Math.round(total / 60)} min au total`;
-    $("#r-arrow").textContent = R.gi + 1; $("#r-word").innerHTML = `${esc(n)}<div class="small muted" style="font-family:var(--body);font-weight:400;font-size:16px;max-width:420px;margin:10px auto 0">${esc(d)}</div>`;
-    beep(0, 1000, .2);
+    $("#r-arrow").textContent = R.gi + 1;
+    $("#r-word").innerHTML = `${esc(n)}<div class="small muted" style="font-family:var(--body);font-weight:400;font-size:16px;max-width:420px;margin:10px auto 0">${esc(d)}</div>${R.sides && R.half ? `<div class="chip ball" style="margin-top:12px;display:inline-block">↔ Change de côté</div>` : ""}`;
   };
-  clearInterval(R.h); next();
+  const paint = () => {
+    $("#r-time").textContent = mmss(Math.max(0, R.left));
+    go.textContent = R.run ? "⏸ Pause" : R.left < steps[R.gi][1] ? "▶ Reprendre" : "▶ C'est parti";
+    go.classList.toggle("primary", !R.run); go.classList.toggle("ghost", R.run);
+    $("#react").classList.toggle("rest", !R.run);
+  };
+  const load = () => {
+    R.gi++; if (R.gi >= steps.length) { go.style.display = "none"; beep(0, 660, .5); beep(.3, 880, .5); stopReact(); toast(doneMsg); return; }
+    const [, sec, d] = steps[R.gi];
+    Object.assign(R, { run: false, left: sec, half: false, sides: /par (jambe|côté|bras)|les deux bras/i.test(d), cd: {} });
+    go.style.display = ""; show(); paint();
+  };
+  R.guidedNext = () => { if (R.gi > -1 && R.gi < steps.length) beep(0, 880, .15); load(); };
+  go.onclick = () => {
+    if (R.run) { R.left = (R.end - Date.now()) / 1000; R.run = false; }
+    else { unlockAudio(); R.end = Date.now() + R.left * 1000; R.run = true; beep(0, 1000, .2); }
+    show(); paint();
+  };
+  clearInterval(R.h); load();
   R.h = setInterval(() => {
-    const left = (R.end - Date.now()) / 1000;
-    $("#r-time").textContent = mmss(Math.max(0, left));
-    if (left <= 3.05 && left > 0 && !R.cd[Math.ceil(left)]) { R.cd[Math.ceil(left)] = 1; beep(0, 520, .08); }
-    if (left <= 0) next();
+    if (!R.run) return;
+    const sec = steps[R.gi][1]; R.left = (R.end - Date.now()) / 1000;
+    if (R.sides && !R.half && R.left <= sec / 2) { R.half = true; beep(0, 880, .15); beep(.2, 880, .15); show(); }
+    if (R.left <= 3.05 && R.left > 0 && !R.cd[Math.ceil(R.left)]) { R.cd[Math.ceil(R.left)] = 1; beep(0, 520, .08); }
+    if (R.left <= 0) { beep(0, 1100, .3); load(); return; }
+    paint();
   }, 200);
 }
-function stopReact() { clearInterval(R.h); R.h = null; $("#react").classList.remove("on", "rest"); R.guided = null; try { R.lock?.release(); } catch (e) {} R.lock = null; }
+function stopReact() { clearInterval(R.h); R.h = null; $("#react").classList.remove("on", "rest"); R.guided = null; R.guidedNext = null; $("#r-go").style.display = "none"; try { R.lock?.release(); } catch (e) {} R.lock = null; }
 $("#r-stop").onclick = () => stopReact();
-$("#r-skip").onclick = () => { R.end = Date.now(); };
+$("#r-skip").onclick = () => { if (R.guidedNext) R.guidedNext(); else R.end = Date.now(); };
 
 function finishSession(key) {
   const c = S.current;
