@@ -1574,6 +1574,7 @@ function buildReminders() {
   if (h.crea) for (let i = 0; i <= 8; i++) {
     const d = plusDays(today, i); if (creaOf(d)) continue;
     add(`crea-${d}`, at(d, h.creaAt || "08:00"), "Créatine 💊", "Ta dose du jour, puis coche la case dans l'appli.", "./#accueil");
+    if (h.creaAt2 && h.creaAt2 > (h.creaAt || "08:00")) add(`crea2-${d}`, at(d, h.creaAt2), "Créatine pas cochée 💊", "Tu l'as prise ? Coche la case, sinon c'est le moment.", "./#accueil");
   }
   // Rappel de test (bouton dans Réglages) : gardé 20 min pour que la fonction le voie
   const tst = Store.lsGet("pushTest"); if (tst && tst > now - 20 * 60000) out.push({ id: "test-" + tst, at: tst, title: "Test Salle Padel 🎾", body: "Les rappels marchent !", url: "./#reglages" });
@@ -1612,7 +1613,7 @@ async function enablePush() {
 // Eau : verres de 25 cl notés dans l'appli. Objectifs plus hauts les jours d'entraînement.
 const STEPS_FN = "https://europe-west9-les-mimichats.cloudfunctions.net/pasSallePadel";
 const SHORTCUT_NAME = "Pas Salle Padel";
-const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30", bottle: 75, wakeWk: "06:30", sleepGoal: 0, crea: true, creaAt: "08:00" };
+const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30", bottle: 75, wakeWk: "06:30", sleepGoal: 0, crea: true, creaAt: "08:00", creaAt2: "22:00" };
 const H = () => ({ ...HDEF, ...(S.health || {}) });
 function saveHealth() { return Store.set("health", S.health).catch(() => toast("Sauvegarde impossible")); }
 // Jours de salle (faits ou prévus cette semaine), calculés une fois
@@ -1820,7 +1821,9 @@ function healthSettingsHtml() {
     ${tog("hs-st", h.stretch, "Rappels étirements & motricité", "Après le padel, et les soirs sans salle ni padel")}
     <label class="fld">Heure du rappel motricité (soirs sans entraînement)<input id="hs-mob" type="time" value="${h.mobAt}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
     ${tog("hs-cr", h.crea, "Rappel créatine", "Tous les jours, sauf si la case est déjà cochée")}
-    <label class="fld">Heure du rappel créatine<input id="hs-cra" type="time" value="${h.creaAt}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    <div class="row"><label class="fld" style="flex:1">1er rappel créatine<input id="hs-cra" type="time" value="${h.creaAt}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+      <label class="fld" style="flex:1">2e rappel (si pas cochée)<input id="hs-cra2" type="time" value="${h.creaAt2 || ""}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label></div>
+    <p class="small muted" style="margin:-4px 0 0">Efface l'heure du 2e rappel pour le couper.</p>
     <button class="btn primary block" id="hs-save" type="button">Enregistrer</button>
     <details class="how" style="border:1px solid var(--line);border-radius:var(--r)"><summary>Installer le raccourci des pas (une seule fois)</summary><div class="how-body" id="hs-sc">
       ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro (plus haut).</p>` : `<p class="small muted" style="margin:0">Chargement…</p>`}</div></details>`;
@@ -1850,7 +1853,8 @@ function bindHealthSettings() {
     if (!w || w < 1 || w > 6) { toast("Eau : entre 1 et 6 litres"); return; }
     const f = $("#hs-f").value || HDEF.hFrom, t = $("#hs-t").value || HDEF.hTo;
     if (t <= f) { toast("L'heure de fin doit être après le début"); return; }
-    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt, bottle: +$("#hs-b").value, wakeWk: $("#hs-wk").value || HDEF.wakeWk, sleepGoal: +$("#hs-sl").value, crea: $("#hs-cr").getAttribute("aria-checked") === "true", creaAt: $("#hs-cra").value || HDEF.creaAt };
+    if ($("#hs-cra2").value && $("#hs-cra2").value <= ($("#hs-cra").value || HDEF.creaAt)) { toast("Le 2e rappel créatine doit être après le 1er"); return; }
+    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt, bottle: +$("#hs-b").value, wakeWk: $("#hs-wk").value || HDEF.wakeWk, sleepGoal: +$("#hs-sl").value, crea: $("#hs-cr").getAttribute("aria-checked") === "true", creaAt: $("#hs-cra").value || HDEF.creaAt, creaAt2: $("#hs-cra2").value || "" };
     await saveHealth(); syncReminders(); toast("Réglages enregistrés");
   };
   const box = $("#hs-sc"); if (!box || Store.mode !== "db") return;
@@ -2286,7 +2290,7 @@ function renderSettings() {
     ${syncHtml()}
     <h2 style="margin-top:12px">Rappels</h2>
     ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro ci-dessus : les rappels passent par ton compte.</p>`
-      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li>${H().hydra ? "<li>de quoi boire, toutes les " + String(H().hEvery).replace(".", ",") + " h de " + H().hFrom.replace(":", "h") + " à " + H().hTo.replace(":", "h") + "</li>" : ""}${H().stretch ? "<li>étirements après le padel, motricité les soirs libres</li>" : ""}${H().crea ? "<li>créatine à " + H().creaAt.replace(":", "h") + " (sauf si déjà cochée)</li>" : ""}</ul></div><button class="btn primary block" id="push-test" type="button">Envoyer une notification de test</button><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
+      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li>${H().hydra ? "<li>de quoi boire, toutes les " + String(H().hEvery).replace(".", ",") + " h de " + H().hFrom.replace(":", "h") + " à " + H().hTo.replace(":", "h") + "</li>" : ""}${H().stretch ? "<li>étirements après le padel, motricité les soirs libres</li>" : ""}${H().crea ? "<li>créatine à " + H().creaAt.replace(":", "h") + (H().creaAt2 && H().creaAt2 > H().creaAt ? " et " + H().creaAt2.replace(":", "h") : "") + " (sauf si déjà cochée)</li>" : ""}</ul></div><button class="btn primary block" id="push-test" type="button">Envoyer une notification de test</button><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
       : `<p class="small muted" style="margin:0">Séance du lendemain, échauffement avant un match, pesée du lundi, match à noter… L'appli doit être ouverte depuis son icône sur l'écran d'accueil.</p><button class="btn primary block" id="push-on" type="button">Activer les rappels</button>`}
     ${healthSettingsHtml()}
     <h2 style="margin-top:12px">Nouveau cycle</h2>
