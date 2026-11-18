@@ -1570,6 +1570,11 @@ function buildReminders() {
       add(`mob-${d}`, at(d, h.mobAt || "18:30"), "Motricité ou étirements ce soir ? 🤸", homeThisWeek() < HOME_TARGET ? `Séance M (20 min) : ${homeThisWeek()}/${HOME_TARGET} cette semaine.` : "10 min d'étirements suffisent pour récupérer.", "./#seance-m");
     }
   }
+  // Créatine : tous les jours à l'heure choisie ; pas de rappel si déjà cochée aujourd'hui
+  if (h.crea) for (let i = 0; i <= 8; i++) {
+    const d = plusDays(today, i); if (creaOf(d)) continue;
+    add(`crea-${d}`, at(d, h.creaAt || "08:00"), "Créatine 💊", "Ta dose du jour, puis coche la case dans l'appli.", "./#accueil");
+  }
   // Rappel de test (bouton dans Réglages) : gardé 20 min pour que la fonction le voie
   const tst = Store.lsGet("pushTest"); if (tst && tst > now - 20 * 60000) out.push({ id: "test-" + tst, at: tst, title: "Test Salle Padel 🎾", body: "Les rappels marchent !", url: "./#reglages" });
   return out.sort((a, b) => a.at - b.at);
@@ -1607,7 +1612,7 @@ async function enablePush() {
 // Eau : verres de 25 cl notés dans l'appli. Objectifs plus hauts les jours d'entraînement.
 const STEPS_FN = "https://europe-west9-les-mimichats.cloudfunctions.net/pasSallePadel";
 const SHORTCUT_NAME = "Pas Salle Padel";
-const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30", bottle: 75, wakeWk: "06:30", sleepGoal: 0 };
+const HDEF = { stepGoal: 12000, restBonus: 1000, waterL: 2.5, hydra: true, hFrom: "09:00", hTo: "21:00", hEvery: 2, stretch: true, mobAt: "18:30", bottle: 75, wakeWk: "06:30", sleepGoal: 0, crea: true, creaAt: "08:00" };
 const H = () => ({ ...HDEF, ...(S.health || {}) });
 function saveHealth() { return Store.set("health", S.health).catch(() => toast("Sauvegarde impossible")); }
 // Jours de salle (faits ou prévus cette semaine), calculés une fois
@@ -1626,6 +1631,26 @@ function waterGoalFor(iso, gym) { const k = dayKind(iso, gym); return Math.round
 const litres = g => (g / 4).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " L";
 const stepsOf = iso => (S.steps || {})[iso];
 const waterOf = iso => (S.health?.water || {})[iso] || 0;
+// ---- Créatine : une case par jour
+const creaOf = iso => !!(S.health?.crea || {})[iso];
+function creaStreak() {
+  let n = 0, d = isoDate(new Date());
+  if (!creaOf(d)) d = plusDays(d, -1);
+  while (creaOf(d) && n < 999) { n++; d = plusDays(d, -1); }
+  return n;
+}
+async function toggleCrea(iso) {
+  S.health = S.health || {}; S.health.crea = { ...(S.health.crea || {}) };
+  if (S.health.crea[iso]) delete S.health.crea[iso]; else S.health.crea[iso] = true;
+  for (const k of Object.keys(S.health.crea).sort().slice(0, -120)) delete S.health.crea[k];
+  await saveHealth(); syncReminders();
+}
+function creaHtml() {
+  const iso = isoDate(new Date()), on = creaOf(iso), n = creaStreak();
+  return `<button class="ex" id="h-crea" type="button" aria-pressed="${on}" style="padding:10px 12px;display:flex;gap:10px;align-items:center;text-align:left;color:inherit;font:inherit;width:100%;${on ? "border-color:rgba(79,211,154,.55)" : ""}">
+    <span style="width:26px;height:26px;border-radius:8px;border:1.5px solid ${on ? "var(--good)" : "var(--line)"};background:${on ? "var(--good)" : "transparent"};display:grid;place-items:center;font-weight:700;color:#062A1B;flex:none">${on ? "✓" : ""}</span>
+    <span style="flex:1"><b>💊 Créatine</b> <span class="small muted">${on ? "prise aujourd'hui" : "à prendre aujourd'hui"}</span>${n > 1 ? `<span class="small muted" style="display:block">🔥 ${n} jours d'affilée</span>` : ""}</span></button>`;
+}
 function stepStreak(gym) {
   let n = 0, d = isoDate(new Date());
   if (!(stepsOf(d) >= stepGoalFor(d, gym))) d = plusDays(d, -1); // aujourd'hui pas encore fini : on part d'hier
@@ -1721,6 +1746,7 @@ function healthHtml() {
     </div></div>
     <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn sm ghost" id="h-wm" type="button" aria-label="Retirer un verre" style="flex:0 0 52px">−</button><button class="btn sm primary" id="h-wp" type="button" style="flex:1;white-space:nowrap">+ 🥛 Verre</button><button class="btn sm primary" id="h-wb" type="button" style="flex:1;white-space:nowrap">+ 🧴 Bouteille</button></div>
     <p class="small muted" style="margin:-4px 0 0">Objectifs du ${kindTxt}. Verre = 25 cl · bouteille = ${H().bottle} cl (réglable).</p>
+    ${creaHtml()}
     ${sleepHtml()}`;
 }
 function bindHealth() {
@@ -1731,6 +1757,7 @@ function bindHealth() {
   const b = $("#h-wb"); if (b) b.onclick = () => drink(Math.round(H().bottle / 25));
   if (m) m.onclick = async () => { if (!waterOf(isoDate(new Date()))) return; await addWater(-1); renderHome(); };
   if (s) s.onclick = () => healthSheet();
+  const cr = $("#h-crea"); if (cr) cr.onclick = async () => { const d = isoDate(new Date()); await toggleCrea(d); toast(creaOf(d) ? "Créatine cochée 💊" : "Créatine décochée"); renderHome(); };
   const iso = isoDate(new Date());
   const ok = $("#sl-ok"); if (ok) ok.onclick = async () => {
     const bed = $("#sl-bed").value, wake = $("#sl-wake") ? $("#sl-wake").value : H().wakeWk;
@@ -1780,7 +1807,7 @@ async function ensureStepsKey() {
 function healthSettingsHtml() {
   const h = H();
   const tog = (id, on, label, sub) => `<div class="toggle"><div><b>${label}</b><div class="small muted">${sub}</div></div><button class="sw" id="${id}" role="switch" aria-checked="${on}" aria-label="${label}"></button></div>`;
-  return `<h2 style="margin-top:12px" id="health-set">Pas, eau & sommeil</h2>
+  return `<h2 style="margin-top:12px" id="health-set">Pas, eau, sommeil & créatine</h2>
     <div class="row"><label class="fld" style="flex:1">Objectif de pas${inp("hs-sg", "12000", h.stepGoal, "numeric")}</label><label class="fld" style="flex:1">+ jours de repos${inp("hs-rb", "1000", h.restBonus, "numeric")}</label></div>
     <label class="fld">Eau par jour (litres, hors entraînement)${inp("hs-w", "2,5", String(h.waterL).replace(".", ","), "decimal")}</label>
     <p class="small muted" style="margin:-4px 0 0">Jour de salle ou de padel : +0,5 L. Jour de tournoi : +1 L.</p>
@@ -1792,6 +1819,8 @@ function healthSettingsHtml() {
       <label class="fld" style="flex:1">Toutes les<select id="hs-e">${[1, 1.5, 2, 3].map(x => `<option value="${x}" ${+h.hEvery === x ? "selected" : ""}>${String(x).replace(".", ",")} h</option>`).join("")}</select></label></div>
     ${tog("hs-st", h.stretch, "Rappels étirements & motricité", "Après le padel, et les soirs sans salle ni padel")}
     <label class="fld">Heure du rappel motricité (soirs sans entraînement)<input id="hs-mob" type="time" value="${h.mobAt}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
+    ${tog("hs-cr", h.crea, "Rappel créatine", "Tous les jours, sauf si la case est déjà cochée")}
+    <label class="fld">Heure du rappel créatine<input id="hs-cra" type="time" value="${h.creaAt}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
     <button class="btn primary block" id="hs-save" type="button">Enregistrer</button>
     <details class="how" style="border:1px solid var(--line);border-radius:var(--r)"><summary>Installer le raccourci des pas (une seule fois)</summary><div class="how-body" id="hs-sc">
       ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro (plus haut).</p>` : `<p class="small muted" style="margin:0">Chargement…</p>`}</div></details>`;
@@ -1814,14 +1843,14 @@ function shortcutHelp(url) {
 }
 function bindHealthSettings() {
   const sw = id => { const b = $("#" + id); if (b) b.onclick = () => b.setAttribute("aria-checked", b.getAttribute("aria-checked") !== "true"); };
-  sw("hs-hy"); sw("hs-st");
+  sw("hs-hy"); sw("hs-st"); sw("hs-cr");
   $("#hs-save").onclick = async () => {
     const sg = num($("#hs-sg").value), rb = num($("#hs-rb").value), w = num($("#hs-w").value);
     if (!sg || sg < 1000 || sg > 40000) { toast("Objectif de pas entre 1 000 et 40 000"); return; }
     if (!w || w < 1 || w > 6) { toast("Eau : entre 1 et 6 litres"); return; }
     const f = $("#hs-f").value || HDEF.hFrom, t = $("#hs-t").value || HDEF.hTo;
     if (t <= f) { toast("L'heure de fin doit être après le début"); return; }
-    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt, bottle: +$("#hs-b").value, wakeWk: $("#hs-wk").value || HDEF.wakeWk, sleepGoal: +$("#hs-sl").value };
+    S.health = { ...(S.health || {}), stepGoal: Math.round(sg), restBonus: Math.max(0, Math.round(rb ?? 0)), waterL: w, hydra: $("#hs-hy").getAttribute("aria-checked") === "true", hFrom: f, hTo: t, hEvery: +$("#hs-e").value, stretch: $("#hs-st").getAttribute("aria-checked") === "true", mobAt: $("#hs-mob").value || HDEF.mobAt, bottle: +$("#hs-b").value, wakeWk: $("#hs-wk").value || HDEF.wakeWk, sleepGoal: +$("#hs-sl").value, crea: $("#hs-cr").getAttribute("aria-checked") === "true", creaAt: $("#hs-cra").value || HDEF.creaAt };
     await saveHealth(); syncReminders(); toast("Réglages enregistrés");
   };
   const box = $("#hs-sc"); if (!box || Store.mode !== "db") return;
@@ -2257,7 +2286,7 @@ function renderSettings() {
     ${syncHtml()}
     <h2 style="margin-top:12px">Rappels</h2>
     ${Store.mode !== "db" ? `<p class="small muted" style="margin:0">Active d'abord la synchro ci-dessus : les rappels passent par ton compte.</p>`
-      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li>${H().hydra ? "<li>de quoi boire, toutes les " + String(H().hEvery).replace(".", ",") + " h de " + H().hFrom.replace(":", "h") + " à " + H().hTo.replace(":", "h") + "</li>" : ""}${H().stretch ? "<li>étirements après le padel, motricité les soirs libres</li>" : ""}</ul></div><button class="btn primary block" id="push-test" type="button">Envoyer une notification de test</button><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
+      : Store.lsGet("pushOn") ? `<div class="notice info small">🔔 Rappels activés sur ce téléphone :<ul style="margin:6px 0 0;padding-left:18px"><li>la veille à 20 h d'une séance de salle prévue</li><li>1 h 15 avant un match (pour l'échauffement)</li><li>la veille d'un tournoi</li><li>après un match, pour le noter</li><li>le lundi à 8 h pour la pesée</li><li>le jeudi soir s'il manque une séance M</li>${H().hydra ? "<li>de quoi boire, toutes les " + String(H().hEvery).replace(".", ",") + " h de " + H().hFrom.replace(":", "h") + " à " + H().hTo.replace(":", "h") + "</li>" : ""}${H().stretch ? "<li>étirements après le padel, motricité les soirs libres</li>" : ""}${H().crea ? "<li>créatine à " + H().creaAt.replace(":", "h") + " (sauf si déjà cochée)</li>" : ""}</ul></div><button class="btn primary block" id="push-test" type="button">Envoyer une notification de test</button><button class="btn ghost block" id="push-on" type="button">Réactiver (si tu ne reçois rien)</button>`
       : `<p class="small muted" style="margin:0">Séance du lendemain, échauffement avant un match, pesée du lundi, match à noter… L'appli doit être ouverte depuis son icône sur l'écran d'accueil.</p><button class="btn primary block" id="push-on" type="button">Activer les rappels</button>`}
     ${healthSettingsHtml()}
     <h2 style="margin-top:12px">Nouveau cycle</h2>
