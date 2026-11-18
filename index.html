@@ -1452,6 +1452,14 @@ function matchToNote() {
   }
   return null;
 }
+// Résultat déduit du score (« 6/4 3/6 7/5 », « 6-4 6-3 ») : le 1er chiffre de chaque set est le tien
+function resFromScore(sc) {
+  const sets = [...String(sc || "").matchAll(/(\d{1,2})\s*[\/\-–:]\s*(\d{1,2})/g)].map(m => [+m[1], +m[2]]).filter(([a, b]) => a !== b);
+  if (!sets.length) return null;
+  const w = sets.filter(([a, b]) => a > b).length, l = sets.length - w;
+  return w > l ? "V" : l > w ? "D" : null;
+}
+const resOf = j => j.res || resFromScore(j.score);
 function journalSheet(j = {}) {
   const partners = (S.comp?.partners || []).map(p => p.name);
   const good = new Set(j.good || []), bad = new Set(j.bad || []);
@@ -1459,7 +1467,7 @@ function journalSheet(j = {}) {
   openSheet(`<h2>${j.id ? "Modifier le match" : "Noter un match"}</h2>
     <div class="row"><label class="fld" style="flex:1">Jour<input id="j-d" type="date" value="${j.date || isoDate(new Date())}" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
       <label class="fld" style="flex:1">Type<select id="j-t">${[["match", "Match"], ["tournoi", "Tournoi"], ["entrainement", "Entraînement"]].map(([k, l]) => `<option value="${k}" ${(j.type || "match") === k ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
-    <div class="fld">Résultat<div class="row" id="j-r">${[["V", "Victoire"], ["D", "Défaite"]].map(([k, l]) => `<button type="button" class="chip ${j.res === k ? (k === "V" ? "good" : "warn") : ""}" data-r="${k}" style="border:0;padding:8px 16px;font:inherit;font-weight:700">${l}</button>`).join("")}</div></div>
+    <div class="fld">Résultat<div class="row" id="j-r">${[["V", "Victoire"], ["D", "Défaite"]].map(([k, l]) => `<button type="button" class="chip ${resOf(j) === k ? (k === "V" ? "good" : "warn") : ""}" data-r="${k}" style="border:0;padding:8px 16px;font:inherit;font-weight:700">${l}</button>`).join("")}</div></div>
     <label class="fld">Score <span class="small muted" style="font-weight:400">(facultatif)</span><input id="j-s" value="${esc(j.score || "")}" placeholder="6/4 3/6 7/5" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"></label>
     <label class="fld">Partenaire<input id="j-p" list="jplist" value="${esc(j.partner || "")}" placeholder="Nom" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px;color:var(--chalk)"><datalist id="jplist">${partners.map(n => `<option value="${esc(n)}">`).join("")}</datalist></label>
     <div class="fld">Ressenti<div class="forms" id="j-f">${FORMS.map(([n, e, l]) => `<button type="button" class="fbtn ${j.feel === n ? "on" : ""}" data-f="${n}"><span>${e}</span><small>${["Nul", "Bof", "Moyen", "Bien", "Top"][n - 1]}</small></button>`).join("")}</div></div>
@@ -1467,7 +1475,7 @@ function journalSheet(j = {}) {
     <div class="fld">🔧 À travailler<div class="cgrid" id="j-b">${chips(bad, "warn", "b")}</div></div>
     <label class="fld">Note <span class="small muted" style="font-weight:400">(facultatif)</span><textarea id="j-n" rows="2" placeholder="Adversaires, ce qui a fait la différence…" style="background:var(--court);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-size:16px;color:var(--chalk)">${esc(j.note || "")}</textarea></label>
     ${j.id ? `<button class="btn sm danger" id="j-del" type="button">Supprimer ce match</button>` : ""}`, async () => {
-    const res = $("#j-r .chip.good, #j-r .chip.warn")?.dataset.r || null;
+    const res = $("#j-r .chip.good, #j-r .chip.warn")?.dataset.r || resFromScore($("#j-s").value);
     const item = { id: j.id || "j" + Date.now(), date: $("#j-d").value || isoDate(new Date()), type: $("#j-t").value, res, score: $("#j-s").value.trim(), partner: $("#j-p").value.trim(),
       feel: +($("#j-f .fbtn.on")?.dataset.f || 0) || null, good: [...good], bad: [...bad], note: $("#j-n").value.trim() };
     S.journal = (S.journal || []).filter(x => x.id !== item.id); S.journal.push(item); S.journal.sort((a, b) => b.date.localeCompare(a.date));
@@ -1475,6 +1483,9 @@ function journalSheet(j = {}) {
   }, () => { location.hash === "#journal" ? renderJournal() : (location.hash = "#journal"); });
   $("#j-r").onclick = e => { const b = e.target.closest("[data-r]"); if (!b) return; const on = !b.classList.contains("good") && !b.classList.contains("warn");
     $("#j-r").querySelectorAll(".chip").forEach(c => c.classList.remove("good", "warn")); if (on) b.classList.add(b.dataset.r === "V" ? "good" : "warn"); };
+  // En tapant le score, Victoire / Défaite se coche toute seule
+  $("#j-s").oninput = () => { const r = resFromScore($("#j-s").value); if (!r) return;
+    $("#j-r").querySelectorAll(".chip").forEach(c => { c.classList.remove("good", "warn"); if (c.dataset.r === r) c.classList.add(r === "V" ? "good" : "warn"); }); };
   $("#j-f").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return; const on = !b.classList.contains("on"); $("#j-f").querySelectorAll(".fbtn").forEach(c => c.classList.remove("on")); if (on) b.classList.add("on"); };
   [["#j-g", good, "good"], ["#j-b", bad, "warn"]].forEach(([sel, set, cls]) => $(sel).onclick = e => { const b = e.target.closest("[data-c]"); if (!b) return; const c = b.dataset.c; set.has(c) ? set.delete(c) : set.add(c); b.classList.toggle(cls, set.has(c)); });
   const del = $("#j-del"); if (del) del.onclick = () => confirmSheet("Supprimer ce match ?", "Il disparaîtra du journal et des statistiques.", "Supprimer", async () => { S.journal = S.journal.filter(x => x.id !== j.id); await saveJournal(); renderJournal(); });
@@ -1491,12 +1502,12 @@ function barsHtml(entries, color) {
 function renderJournal() {
   const all = S.journal || [];
   const since = isoDate(new Date(Date.now() - 60 * DAY)), recent = all.filter(j => j.date >= since);
-  const V = recent.filter(j => j.res === "V").length, D = recent.filter(j => j.res === "D").length;
+  const V = recent.filter(j => resOf(j) === "V").length, D = recent.filter(j => resOf(j) === "D").length;
   const bad = countCoups(recent, "bad"), good = countCoups(recent, "good");
   const todo = matchToNote();
   const focus = bad[0] && bad[0][1] >= 2 ? `<div class="notice small"><b>À travailler en priorité : ${esc(bad[0][0].toLowerCase())}</b> (noté ${bad[0][1]} fois en 2 mois)${bad[1] && bad[1][1] >= 2 ? `, puis ${esc(bad[1][0].toLowerCase())}` : ""}. Demande à ton coach d'en faire le thème de tes prochains cours.</div>` : "";
   const list = all.map(j => `<button class="jcard" type="button" data-j="${j.id}" style="text-align:left;color:inherit;font:inherit">
-    <div class="row between"><div class="row">${j.res ? `<span class="res ${j.res}">${j.res}</span>` : ""}<div><b>${frDate(j.date)}</b> · ${{ match: "Match", tournoi: "Tournoi", entrainement: "Entraînement" }[j.type] || "Match"}<div class="small muted">${[j.partner && "avec " + esc(j.partner), j.score && esc(j.score)].filter(Boolean).join(" · ")}</div></div></div>${j.feel ? `<span style="font-size:20px">${FORMS[j.feel - 1][1]}</span>` : ""}</div>
+    <div class="row between"><div class="row">${resOf(j) ? `<span class="res ${resOf(j)}">${resOf(j)}</span>` : ""}<div><b>${frDate(j.date)}</b> · ${{ match: "Match", tournoi: "Tournoi", entrainement: "Entraînement" }[j.type] || "Match"}<div class="small muted">${[j.partner && "avec " + esc(j.partner), j.score && esc(j.score)].filter(Boolean).join(" · ")}</div></div></div>${j.feel ? `<span style="font-size:20px">${FORMS[j.feel - 1][1]}</span>` : ""}</div>
     ${(j.good || []).length || (j.bad || []).length ? `<div class="cgrid">${(j.good || []).map(c => `<span class="chip good">${esc(c)}</span>`).join("")}${(j.bad || []).map(c => `<span class="chip warn">${esc(c)}</span>`).join("")}</div>` : ""}
     ${j.note ? `<div class="small muted">${esc(j.note)}</div>` : ""}</button>`).join("");
   app.innerHTML = `<div class="stack">
@@ -1914,7 +1925,7 @@ function renderBilan() {
   const res = (S.comp?.results || []).filter(r => inM(r.date)), pts = res.reduce((a, r) => a + (+r.pts || 0), 0);
   const hist = (S.comp?.history || []).slice().sort((a, b) => a.month.localeCompare(b.month));
   const hNow = hist.filter(h => h.month <= ym).pop(), hPrev = hist.filter(h => h.month < (hNow?.month || ym)).pop();
-  const jr = (S.journal || []).filter(j => inM(j.date)), V = jr.filter(j => j.res === "V").length, D = jr.filter(j => j.res === "D").length;
+  const jr = (S.journal || []).filter(j => inM(j.date)), V = jr.filter(j => resOf(j) === "V").length, D = jr.filter(j => resOf(j) === "D").length;
   const bad = countCoups(jr, "bad");
   const label = new Date(y, m - 1, 15).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
   const prevYm = isoDate(new Date(y, m - 2, 15)).slice(0, 7), nextYm = isoDate(new Date(y, m, 15)).slice(0, 7);
