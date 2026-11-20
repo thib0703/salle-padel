@@ -1802,6 +1802,39 @@ function bindHealth() {
   const se = $("#sl-edit"); if (se) se.onclick = () => sleepSheet(iso);
   app.querySelectorAll("[data-nap]").forEach(b => b.onclick = async () => { const m = +b.dataset.nap; await saveNap(iso, napOf(iso) === m ? 0 : m); toast(m && napOf(iso) ? "Sieste : " + m + " min" : "Sieste effacée"); renderHome(); });
 }
+// 📅 Historique des pas jour par jour, groupé par semaine (le serveur garde ~400 jours)
+let histWeeks = 4;
+function stepsHistoryHtml(gym) {
+  const today = isoDate(new Date());
+  const keys = Object.keys(S.steps || {}).filter(k => !k.startsWith("_")).sort();
+  if (!keys.length) return `<p class="small muted" style="margin:0">Pas encore d'historique : installe le raccourci pour envoyer tes pas.</p>`;
+  const monday = iso => { const g = (parseISO(iso).getDay() + 6) % 7; return plusDays(iso, -g); };
+  const first = monday(keys[0]); let wk = monday(today); const weeks = [];
+  while (wk >= first && weeks.length < histWeeks) { weeks.push(wk); wk = plusDays(wk, -7); }
+  const more = wk >= first;
+  const dayName = iso => parseISO(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+  const wkHtml = weeks.map(w => {
+    const days = Array.from({ length: 7 }, (_, i) => plusDays(w, 6 - i)).filter(d => d <= today);
+    const vals = days.map(d => stepsOf(d)).filter(v => v != null);
+    const tot = vals.reduce((a, b) => a + b, 0), avg = vals.length ? Math.round(tot / vals.length) : null;
+    const hit = days.filter(d => stepsOf(d) >= stepGoalFor(d, gym)).length;
+    const label = w === monday(today) ? "Cette semaine" : "Semaine du " + parseISO(w).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    return `<details class="ex" style="padding:8px 10px"${w === monday(today) ? " open" : ""}><summary style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;list-style:none">
+      <b>${label}</b><span class="small muted">${avg != null ? "moy. " + frNum(avg) + " · " : ""}${hit}/${days.length} ✅</span></summary>
+      <div style="display:flex;flex-direction:column;gap:2px;margin-top:6px">${days.map(d => { const v = stepsOf(d), g = stepGoalFor(d, gym), ok = v >= g, k = dayKind(d, gym);
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:13.5px;padding:3px 0;border-top:1px solid var(--line)">
+          <span style="width:92px;flex:none;text-transform:capitalize">${dayName(d)}</span>
+          <span style="flex:1;height:8px;border-radius:4px;background:var(--court-3);overflow:hidden"><span style="display:block;height:100%;width:${Math.min(100, (v || 0) / g * 100)}%;background:${ok ? "var(--good)" : "var(--ball)"}"></span></span>
+          <b class="num" style="width:62px;text-align:right">${frNum(v)}</b><span style="width:18px;text-align:center">${v == null ? "" : ok ? "✅" : ""}</span>
+          <span class="small muted" style="width:16px">${k === "tournoi" ? "🏆" : k === "actif" ? "💪" : ""}</span></div>`; }).join("")}</div>
+      <p class="small muted" style="margin:6px 0 0">Total ${frNum(tot)} pas · 💪 entraînement · 🏆 tournoi</p></details>`; }).join("");
+  // Moyennes par mois
+  const months = {}; for (const d of keys) { const m = d.slice(0, 7); (months[m] = months[m] || []).push(stepsOf(d)); }
+  const mHtml = Object.keys(months).sort().reverse().slice(0, 6).map(m => { const v = months[m], a = Math.round(v.reduce((x, y) => x + y, 0) / v.length);
+    return `<span class="small" style="display:inline-block;padding:4px 9px;border-radius:99px;border:1px solid var(--line);margin:2px">${parseISO(m + "-15").toLocaleDateString("fr-FR", { month: "short", year: "2-digit" })} : <b>${frNum(a)}</b></span>`; }).join("");
+  return `${wkHtml}${more ? `<button class="btn ghost block" id="h-more" type="button">Voir 4 semaines de plus</button>` : ""}
+    <p class="small muted" style="margin:4px 0 0">Moyenne par jour, mois par mois :</p><div>${mHtml}</div>`;
+}
 function healthSheet() {
   const gym = gymDaySet(), today = isoDate(new Date());
   const days = Array.from({ length: 14 }, (_, i) => plusDays(today, i - 13));
@@ -1816,6 +1849,8 @@ function healthSheet() {
   $("#sheet").innerHTML = `<h2>Pas, eau & sommeil · 14 jours</h2>
     <div style="display:flex;gap:3px">${bars}</div>
     <p class="small" style="margin:0">Objectif de pas atteint <b>${done} jour${done > 1 ? "s" : ""} sur 14</b> · moyenne <b>${frNum(avg)}</b> pas. Objectif d'eau atteint <b>${wDays} jour${wDays > 1 ? "s" : ""}</b>. La ligne pointillée est l'objectif du jour (+${frNum(H().restBonus)} pas les jours de repos).</p>
+    <h3 style="margin:6px 0 0">📅 Historique des pas</h3>
+    <div id="h-hist" style="display:flex;flex-direction:column;gap:6px">${stepsHistoryHtml(gym)}</div>
     <h3 style="margin:6px 0 0">😴 Sommeil</h3>
     <div style="display:flex;gap:3px">${slBars}</div>
     <p class="small" style="margin:0">Moyenne : <b>${hFmt(sleepAvg())}</b> par jour, siestes comprises (en clair sur le graphique)${H().sleepGoal ? ` (objectif ${H().sleepGoal} h)` : ""}. Pour corriger une nuit, touche la carte 😴 sur l'écran Semaine.</p>
@@ -1826,6 +1861,8 @@ function healthSheet() {
   $("#modal").classList.add("on");
   const close = () => $("#modal").classList.remove("on");
   $("#m-no").onclick = close; $("#modal").onclick = e => { if (e.target.id === "modal") close(); };
+  const bindMore = () => { const b = $("#h-more"); if (b) b.onclick = () => { histWeeks += 4; $("#h-hist").innerHTML = stepsHistoryHtml(gym); bindMore(); }; };
+  histWeeks = 4; bindMore();
   $("#h-cfg").onclick = () => { close(); location.hash = "#reglages"; setTimeout(() => $("#health-set")?.scrollIntoView({ block: "start" }), 50); };
 }
 function stepsKey() {

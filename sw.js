@@ -1,5 +1,5 @@
 // Service worker : appli hors ligne + notifications de rappel.
-const CACHE = "salle-padel-v22";
+const CACHE = "salle-padel-v23";
 const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
